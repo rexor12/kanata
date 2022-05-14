@@ -1,0 +1,76 @@
+# Welcome
+
+**Kanata** is a very simple dependency injection framework used for decoupling the services of your Python application's services from their dependencies. This may help with maintainability, testability and readability.
+
+Currently, the following lifetime scopes are supported:
+* **Transient:** On each request, a new instance of the specific dependency is created.
+* **Singleton:** On the first request, a new instance is created and this same instance is returned on further requests.
+
+# Requirements
+
+The project currently targets [Python](https://www.python.org/) version 3.10 or higher. Compatibility with older versions may be possible but isn't tested.
+
+# Examples
+
+Using the library is as simple as building a catalog of our injectables and resolving a root injectable:
+
+```py
+from kanata import InjectableCatalog, LifetimeScope, find_injectables
+
+# Find all types from a specific module that have been marked as injectables:
+registrations = find_injectables("my.module")
+
+# Construct a new catalog for these types:
+catalog = InjectableCatalog(registrations)
+
+# Create a scope that manages the resolved instances:
+scope = LifetimeScope(catalog)
+
+# And finally, resolve the injectable type you need:
+instance = scope.resolve(MyClass)
+```
+
+For the above code to work, you need to mark the types you need as injectables. You can currently achieve this by using the `@injectable(...)` decorator as follows:
+
+```py
+from kanata.decorators import injectable
+
+# Typically, you'll want to create an interface to be used as the contract:
+class IMyInterface:
+    pass
+
+# And then register your type as an injectable with its contract:
+@injectable(IMyInterface):
+class MyClass(IMyInterface):
+    ...
+```
+
+As constructor (or `__init(...)__` in Python) injection is used, you need to define the required dependencies in this method:
+
+```py
+from kanata.decorators import injectable
+from typing import Tuple
+
+@injectable(IMyInterface):
+class MyClass(IMyInterface):
+    # Type hints are required for the framework to identify the dependencies. Where multiple dependencies are allowed, you can use a Tuple to specify it.
+    def __init__(
+        self,
+        dependency1: IDependency1,
+        dependency2: IDependency2,
+        multiple_dependencies: Tuple[IDependency3, ...]):
+        ...
+```
+
+The framework will then take care of resolving these dependencies.
+
+Below are some of the dependency resolution rules:
+* If a single dependency is required but there is no matching registration, an exception is raised.
+* If a single dependency is required and there are multiple candidates, it's unspecified which one will be injected. This is mainly because hash tables are used during dependency resolution.
+* If multiple dependencies are required but there are no matching registrations, an empty tuple is injected. Otherwise, a tuple with all matching injectables is injected.
+
+For the ability to customize logging, the [structlog](https://github.com/hynek/structlog) library is used instead of the built-in *logging* module of Python. Please, refer to the project's documentation for details.
+
+# Contribution
+
+Contributions to the project are welcome in the form of [creating an issue](https://github.com/rexor12/kanata/issues) or forking the repository and [creating a pull request](https://github.com/rexor12/kanata/pulls).
