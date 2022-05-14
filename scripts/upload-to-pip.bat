@@ -6,5 +6,5 @@ echo Upgraded twine.
 
 cd /D "%CD%"
 echo Uploading to pypi...
-python -m twine upload --repository testpypi dist/*
+python -m twine upload dist/*
 echo Upload complete.

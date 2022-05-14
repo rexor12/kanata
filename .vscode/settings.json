@@ -5,5 +5,8 @@
         "--disable=missing-module-docstring,too-few-public-methods,wrong-import-order",
         "--max-line-length=100"
     ],
-    "python.analysis.typeCheckingMode": "basic"
+    "python.analysis.typeCheckingMode": "basic",
+    "python.autoComplete.extraPaths": [
+        "./src/kanata"
+    ]
 }
