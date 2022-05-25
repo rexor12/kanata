@@ -8,5 +8,8 @@
     "python.analysis.typeCheckingMode": "basic",
     "python.autoComplete.extraPaths": [
         "./src/kanata"
+    ],
+    "python.analysis.extraPaths": [
+        "./src/kanata"
     ]
 }

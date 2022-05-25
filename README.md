@@ -1,5 +1,7 @@
 # Welcome
 
+[![PyPI version](https://badge.fury.io/py/kanata.svg)](https://badge.fury.io/py/kanata)
+
 **Kanata** is a very simple dependency injection framework used for decoupling the services of your Python application's services from their dependencies. This may help with maintainability, testability and readability.
 
 Currently, the following lifetime scopes are supported:
