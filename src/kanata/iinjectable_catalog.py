@@ -1,6 +1,6 @@
 from .models import InjectableRegistration
 from abc import ABCMeta, abstractmethod
-from typing import Any, Optional, Tuple, Type, TypeVar
+from typing import Any, Iterable, Optional, Type, TypeVar
 
 T = TypeVar("T")
 
@@ -8,15 +8,23 @@ class IInjectableCatalog(metaclass=ABCMeta):
     """Interface for a catalog of injectable registrations."""
 
     @abstractmethod
+    def get_registrations(self) -> Iterable[InjectableRegistration]:
+        """Gets all the registrations available in the catalog.
+
+        :return: The available registrations.
+        :rtype: Iterable[InjectableRegistration]
+        """
+
+    @abstractmethod
     def get_registrations_by_contract(
         self,
-        contract: Type[Any]) -> Tuple[InjectableRegistration, ...]:
+        contract: Type[Any]) -> Iterable[InjectableRegistration]:
         """Gets the registrations associated to the specified contract.
 
         :param contract: The contract for which to get the registrations.
         :type contract: Type[Any]
         :return: The registrations associated to the contract.
-        :rtype: Tuple[InjectableRegistration, ...]
+        :rtype: Iterable[InjectableRegistration]
         """
 
     @abstractmethod
