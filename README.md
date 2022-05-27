@@ -12,7 +12,17 @@ Currently, the following lifetime scopes are supported:
 
 The project currently targets [Python](https://www.python.org/) version 3.10 or higher. Compatibility with older versions may be possible but isn't tested.
 
-# Examples
+# Getting started
+
+First of all, make sure that you install the library in your project. Using a default Python installation, the following will work:
+
+```ps
+# Unix/MacOS
+python3 -m pip install kanata
+
+# Windows
+py -m pip install kanata
+```
 
 Using the library is as simple as building a catalog of our injectables and resolving a root injectable:
 
@@ -47,7 +57,7 @@ class MyClass(IMyInterface):
     ...
 ```
 
-As constructor (or `__init(...)__` in Python) injection is used, you need to define the required dependencies in this method:
+As constructor (or `__init__(...)` in Python) injection is used, you need to define the required dependencies in this method:
 
 ```py
 from kanata.decorators import injectable
@@ -55,7 +65,8 @@ from typing import Tuple
 
 @injectable(IMyInterface):
 class MyClass(IMyInterface):
-    # Type hints are required for the framework to identify the dependencies. Where multiple dependencies are allowed, you can use a Tuple to specify it.
+    # Type hints are required for the framework to identify the dependencies.
+    # Where multiple dependencies are allowed, you can use a Tuple to specify it.
     def __init__(
         self,
         dependency1: IDependency1,
@@ -72,6 +83,32 @@ Below are some of the dependency resolution rules:
 * If multiple dependencies are required but there are no matching registrations, an empty tuple is injected. Otherwise, a tuple with all matching injectables is injected.
 
 For the ability to customize logging, the [structlog](https://github.com/hynek/structlog) library is used instead of the built-in *logging* module of Python. Please, refer to the project's documentation for details.
+
+# Samples
+
+In case you would like to see more samples, clone the repository and run one of the bundled samples.
+
+First, make sure that Kanata is installed, preferably in editable mode (while standing in the root directory):
+
+```ps
+# Unix/MacOS
+python3 -m pip install -e .
+
+# Windows
+py -m pip install -e .
+```
+
+Then, while standing in the root directory, execute the `samples.py` script and follow the on-screen instructions:
+
+```ps
+# Unix/MacOS
+python3 ./samples.py
+
+# Windows
+py .\samples.py
+```
+
+The samples are full of comments to better explain what is happening.
 
 # Contribution
 
