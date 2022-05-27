@@ -10,6 +10,7 @@
         "./src/kanata"
     ],
     "python.analysis.extraPaths": [
-        "./src/kanata"
+        "./src/kanata",
+        "./samples"
     ]
 }
