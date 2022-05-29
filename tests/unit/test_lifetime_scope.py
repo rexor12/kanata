@@ -1,6 +1,7 @@
 from .test_injectables import (
-    CaptiveDependency, MissingMultipleDependencies, MissingSingleDependency,
-    Singleton, Root, Transient1, Transient2
+    MissingMultipleDependencies, MissingSingleDependency, Scoped, ScopedToTransientDependency,
+    Singleton, SingletonToScopedDependency, SingletonToTransientDependency, Root,
+    Transient1, Transient2
 )
 from kanata import InjectableCatalog, LifetimeScope, find_injectables
 from kanata.exceptions import DependencyResolutionException
@@ -68,7 +69,7 @@ class LifetimeScopeTests(unittest.TestCase):
             DependencyResolutionException,
             lambda: scope.resolve(MissingSingleDependency))
 
-    def test_resolve_should_raise_with_singleton_captive_dependency(self):
+    def test_resolve_should_raise_with_singleton_to_transient_dependency(self):
         """Asserts that a singleton injectable that has a transient dependency
         raises an exception with the default options.
         """
@@ -77,9 +78,40 @@ class LifetimeScopeTests(unittest.TestCase):
         catalog = InjectableCatalog(registrations)
         scope = LifetimeScope(catalog)
 
-        self.assertRaises(DependencyResolutionException, lambda: scope.resolve(CaptiveDependency))
+        self.assertRaises(
+            DependencyResolutionException,
+            lambda: scope.resolve(SingletonToTransientDependency)
+        )
 
-    def test_resolve_should_resolve_with_singleton_captive_dependency_when_permitted(self):
+    def test_resolve_should_raise_with_singleton_to_scoped_dependency(self):
+        """Asserts that a singleton injectable that has a scoped dependency
+        raises an exception with the default options.
+        """
+
+        registrations = find_injectables("tests.unit.test_injectables")
+        catalog = InjectableCatalog(registrations)
+        scope = LifetimeScope(catalog)
+
+        self.assertRaises(
+            DependencyResolutionException,
+            lambda: scope.resolve(SingletonToScopedDependency)
+        )
+
+    def test_resolve_should_raise_with_scoped_to_transient_dependency(self):
+        """Asserts that a scoped injectable that has a transient dependency
+        raises an exception with the default options.
+        """
+
+        registrations = find_injectables("tests.unit.test_injectables")
+        catalog = InjectableCatalog(registrations)
+        scope = LifetimeScope(catalog)
+
+        self.assertRaises(
+            DependencyResolutionException,
+            lambda: scope.resolve(ScopedToTransientDependency)
+        )
+
+    def test_resolve_should_resolve_with_singleton_to_transient_dependency_when_permitted(self):
         """Asserts that a singleton injectable that has a transient dependency
         resolves just fine when permitted via the lifetime scope options.
         """
@@ -89,7 +121,35 @@ class LifetimeScopeTests(unittest.TestCase):
         catalog = InjectableCatalog(registrations)
         scope = LifetimeScope(catalog, options)
 
-        instance = scope.resolve(CaptiveDependency)
+        instance = scope.resolve(SingletonToTransientDependency)
+
+        self.assertIsNotNone(instance)
+
+    def test_resolve_should_resolve_with_singleton_to_scoped_dependency_when_permitted(self):
+        """Asserts that a singleton injectable that has a scoped dependency
+        resolves just fine when permitted via the lifetime scope options.
+        """
+
+        registrations = find_injectables("tests.unit.test_injectables")
+        options = LifetimeScopeOptions(raise_on_captive_dependency=False)
+        catalog = InjectableCatalog(registrations)
+        scope = LifetimeScope(catalog, options)
+
+        instance = scope.resolve(SingletonToScopedDependency)
+
+        self.assertIsNotNone(instance)
+
+    def test_resolve_should_resolve_with_scoped_to_transient_dependency_when_permitted(self):
+        """Asserts that a scoped injectable that has a transient dependency
+        resolves just fine when permitted via the lifetime scope options.
+        """
+
+        registrations = find_injectables("tests.unit.test_injectables")
+        options = LifetimeScopeOptions(raise_on_captive_dependency=False)
+        catalog = InjectableCatalog(registrations)
+        scope = LifetimeScope(catalog, options)
+
+        instance = scope.resolve(ScopedToTransientDependency)
 
         self.assertIsNotNone(instance)
 
@@ -128,6 +188,45 @@ class LifetimeScopeTests(unittest.TestCase):
         assert_contains(instance.injectables2, lambda i: type(i) == Transient2)
         assert_contains(instance.injectables2, lambda i: type(i) == Singleton)
         # pylint: enable=unidiomatic-typecheck
+
+    def test_resolve_scoped_injectable_twice_returns_the_same_instance(self):
+        """Asserts that the child lifetime scope creates a new instance of a scoped injectable."""
+
+        registrations = find_injectables("tests.unit.test_injectables")
+        catalog = InjectableCatalog(registrations)
+        scope = LifetimeScope(catalog)
+
+        scoped1 = scope.resolve(Scoped)
+        scoped2 = scope.resolve(Scoped)
+
+        self.assertEqual(scoped1, scoped2)
+
+    def test_resolve_of_child_scope_returns_the_same_singleton_as_parent(self):
+        """Asserts that the child lifetime scope returns the same instance
+        of a singleton as the parent lifetime scope."""
+
+        registrations = find_injectables("tests.unit.test_injectables")
+        catalog = InjectableCatalog(registrations)
+        parent_scope = LifetimeScope(catalog)
+        child_scope = parent_scope.create_child_scope()
+
+        parent_singleton = parent_scope.resolve(Singleton)
+        child_singleton = child_scope.resolve(Singleton)
+
+        self.assertEqual(parent_singleton, child_singleton)
+
+    def test_resolve_of_child_scope_returns_different_scoped_instance_than_parent(self):
+        """Asserts that the child lifetime scope creates a new instance of a scoped injectable."""
+
+        registrations = find_injectables("tests.unit.test_injectables")
+        catalog = InjectableCatalog(registrations)
+        parent_scope = LifetimeScope(catalog)
+        child_scope = parent_scope.create_child_scope()
+
+        parent_scoped = parent_scope.resolve(Scoped)
+        child_scoped = child_scope.resolve(Scoped)
+
+        self.assertNotEqual(parent_scoped, child_scoped)
 
 if __name__ == "__main__":
     unittest.main()

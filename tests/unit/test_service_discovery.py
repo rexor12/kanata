@@ -1,9 +1,9 @@
 from kanata import find_injectables
 from tests.sdk import assert_contains_all, first
 from tests.unit.test_injectables import (
-    INonDependee, IRoot, ISingleton, ITransient1, ITransient2,
-    CaptiveDependency, MissingMultipleDependencies, MissingSingleDependency,
-    Root, Singleton, Transient1, Transient2
+    INonDependee, IRoot, IScoped, ISingleton, ITransient1, ITransient2, SingletonToScopedDependency,
+    SingletonToTransientDependency, MissingMultipleDependencies, MissingSingleDependency,
+    Root, Scoped, Singleton, Transient1, Transient2, ScopedToTransientDependency
 )
 from typing import Any, Dict, Tuple, Type
 
@@ -22,7 +22,10 @@ class ServiceDiscoveryTests(unittest.TestCase):
             Transient2: (ITransient2,),
             MissingMultipleDependencies: (INonDependee,),
             MissingSingleDependency: (INonDependee,),
-            CaptiveDependency: (INonDependee,)
+            Scoped: (IScoped,),
+            ScopedToTransientDependency: (INonDependee,),
+            SingletonToScopedDependency: (INonDependee,),
+            SingletonToTransientDependency: (INonDependee,)
         }
 
         registrations = find_injectables("tests.unit.test_injectables")
