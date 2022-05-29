@@ -1,4 +1,5 @@
-from .captive_dependency import CaptiveDependency
+from .captive_scoped_dependency import CaptiveScopedDependency
+from .captive_transient_dependency import CaptiveTransientDependency
 from .inon_dependee import INonDependee
 from .iroot import IRoot
 from .iscoped import IScoped
