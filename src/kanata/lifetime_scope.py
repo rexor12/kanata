@@ -176,7 +176,7 @@ class LifetimeScope(ILifetimeScope):
             candidate_instances = []
             for registration in registrations:
                 if (dependee_scope == InjectableScopeType.SINGLETON
-                    and registration.scope == InjectableScopeType.TRANSIENT):
+                    and registration.scope != InjectableScopeType.SINGLETON):
                     self.__on_captive_dependency_detected(injectable, dependent_contract)
 
                 scope = get_or_add(self.__instances_by_injectable, registration.scope, lambda _: {})

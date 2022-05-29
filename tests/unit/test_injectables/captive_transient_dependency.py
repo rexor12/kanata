@@ -5,7 +5,7 @@ from kanata.models import InjectableScopeType
 
 @scope(InjectableScopeType.SINGLETON)
 @injectable(INonDependee)
-class CaptiveDependency(INonDependee):
+class CaptiveTransientDependency(INonDependee):
     """A singleton dependent type that depends on a transient instance."""
 
     def __init__(self, transient: ITransient1) -> None: # pylint: disable=unused-argument
