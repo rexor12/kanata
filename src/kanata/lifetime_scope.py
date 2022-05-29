@@ -6,7 +6,7 @@ from .iinjectable_catalog import IInjectableCatalog
 from .ilifetime_scope import ILifetimeScope, TInjectable
 from .models import InjectableScopeType, LifetimeScopeOptions
 from .utils import get_or_add
-from typing import Any, Dict, Generator, List, Set, Tuple, Type, get_args
+from typing import Any, Dict, Generator, List, Optional, Set, Tuple, Type, get_args
 
 import inspect
 import structlog
@@ -20,13 +20,26 @@ class LifetimeScope(ILifetimeScope):
 
     def __init__(self,
                  catalog: IInjectableCatalog,
-                 options: LifetimeScopeOptions = DEFAULT_OPTIONS) -> None:
+                 options: LifetimeScopeOptions = DEFAULT_OPTIONS,
+                 **kwargs: Any) -> None:
         self.__catalog: IInjectableCatalog = catalog
         self.__options: LifetimeScopeOptions = options
         self.__log = structlog.get_logger(LOGGER_NAME)
         self.__instances_by_injectable: Dict[InjectableScopeType, Dict[Type[Any], Set[Any]]] = {}
+        self.__parent: Optional[ILifetimeScope] = None
+
+        if (parent := kwargs.get("parent", None)) is not None:
+            if not isinstance(parent, ILifetimeScope):
+                raise ValueError("The parent must be an instance of ILifetimeScope.")
+            self.__parent = parent
 
     def resolve(self, injectable: Type[TInjectable]) -> TInjectable:
+        registration = self.__catalog.get_registration_by_injectable(injectable)
+        if (registration is not None
+            and registration.scope == InjectableScopeType.SINGLETON
+            and self.__parent is not None):
+            return self.__parent.resolve(injectable)
+
         dependency_graph = self.__build_dependency_graph_for(injectable)
         instance = None
         for current_injectable in topological_sort(dependency_graph, injectable):
@@ -44,6 +57,9 @@ class LifetimeScope(ILifetimeScope):
             )
 
         return instance
+
+    def create_child_scope(self) -> ILifetimeScope:
+        return LifetimeScope(self.__catalog, self.__options, parent=self)
 
     @staticmethod
     def __get_dependent_contracts(
@@ -133,15 +149,16 @@ class LifetimeScope(ILifetimeScope):
                 )
             )
 
-        # For singletons, we know that there exists one instance and one instance only
-        # for all of the associated contracts, therefore we can find and return that one,
-        # if it is created already.
+        # For singleton and scoped injectables, we know that there exists one and only one
+        # instance for all of the associated contracts, therefore we can find and return
+        # taht specific one if it is created already.
         scope_by_injectable = get_or_add(
             self.__instances_by_injectable,
             registration.scope,
             lambda _: {})
         instances_by_injectable = get_or_add(scope_by_injectable, injectable, lambda _: set())
-        if registration.scope == InjectableScopeType.SINGLETON:
+        if (registration.scope == InjectableScopeType.SINGLETON
+            or registration.scope == InjectableScopeType.SCOPED):
             if len(instances_by_injectable) > 0:
                 return next(iter(instances_by_injectable))
 
@@ -159,7 +176,7 @@ class LifetimeScope(ILifetimeScope):
             candidate_instances = []
             for registration in registrations:
                 if (dependee_scope == InjectableScopeType.SINGLETON
-                    and registration.scope == InjectableScopeType.TRANSIENT):
+                    and registration.scope != InjectableScopeType.SINGLETON):
                     self.__on_captive_dependency_detected(injectable, dependent_contract)
 
                 scope = get_or_add(self.__instances_by_injectable, registration.scope, lambda _: {})
