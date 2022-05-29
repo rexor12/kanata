@@ -1,5 +1,3 @@
-from .captive_scoped_dependency import CaptiveScopedDependency
-from .captive_transient_dependency import CaptiveTransientDependency
 from .inon_dependee import INonDependee
 from .iroot import IRoot
 from .iscoped import IScoped
@@ -11,6 +9,9 @@ from .missing_multiple_dependencies import MissingMultipleDependencies
 from .missing_single_dependency import MissingSingleDependency
 from .root import Root
 from .scoped import Scoped
+from .scoped_to_transient_dependency import ScopedToTransientDependency
 from .singleton import Singleton
+from .singleton_to_scoped_dependency import SingletonToScopedDependency
+from .singleton_to_transient_dependency import SingletonToTransientDependency
 from .transient1 import Transient1
 from .transient2 import Transient2

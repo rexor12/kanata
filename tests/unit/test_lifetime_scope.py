@@ -1,6 +1,7 @@
 from .test_injectables import (
-    CaptiveScopedDependency, CaptiveTransientDependency, MissingMultipleDependencies,
-    MissingSingleDependency, Scoped, Singleton, Root, Transient1, Transient2
+    MissingMultipleDependencies, MissingSingleDependency, Scoped, ScopedToTransientDependency,
+    Singleton, SingletonToScopedDependency, SingletonToTransientDependency, Root,
+    Transient1, Transient2
 )
 from kanata import InjectableCatalog, LifetimeScope, find_injectables
 from kanata.exceptions import DependencyResolutionException
@@ -68,7 +69,7 @@ class LifetimeScopeTests(unittest.TestCase):
             DependencyResolutionException,
             lambda: scope.resolve(MissingSingleDependency))
 
-    def test_resolve_should_raise_with_singleton_captive_transient_dependency(self):
+    def test_resolve_should_raise_with_singleton_to_transient_dependency(self):
         """Asserts that a singleton injectable that has a transient dependency
         raises an exception with the default options.
         """
@@ -79,10 +80,10 @@ class LifetimeScopeTests(unittest.TestCase):
 
         self.assertRaises(
             DependencyResolutionException,
-            lambda: scope.resolve(CaptiveTransientDependency)
+            lambda: scope.resolve(SingletonToTransientDependency)
         )
 
-    def test_resolve_should_raise_with_singleton_captive_scoped_dependency(self):
+    def test_resolve_should_raise_with_singleton_to_scoped_dependency(self):
         """Asserts that a singleton injectable that has a scoped dependency
         raises an exception with the default options.
         """
@@ -93,10 +94,24 @@ class LifetimeScopeTests(unittest.TestCase):
 
         self.assertRaises(
             DependencyResolutionException,
-            lambda: scope.resolve(CaptiveScopedDependency)
+            lambda: scope.resolve(SingletonToScopedDependency)
         )
 
-    def test_resolve_should_resolve_with_singleton_captive_transient_dependency_when_permitted(self):
+    def test_resolve_should_raise_with_scoped_to_transient_dependency(self):
+        """Asserts that a scoped injectable that has a transient dependency
+        raises an exception with the default options.
+        """
+
+        registrations = find_injectables("tests.unit.test_injectables")
+        catalog = InjectableCatalog(registrations)
+        scope = LifetimeScope(catalog)
+
+        self.assertRaises(
+            DependencyResolutionException,
+            lambda: scope.resolve(ScopedToTransientDependency)
+        )
+
+    def test_resolve_should_resolve_with_singleton_to_transient_dependency_when_permitted(self):
         """Asserts that a singleton injectable that has a transient dependency
         resolves just fine when permitted via the lifetime scope options.
         """
@@ -106,11 +121,11 @@ class LifetimeScopeTests(unittest.TestCase):
         catalog = InjectableCatalog(registrations)
         scope = LifetimeScope(catalog, options)
 
-        instance = scope.resolve(CaptiveTransientDependency)
+        instance = scope.resolve(SingletonToTransientDependency)
 
         self.assertIsNotNone(instance)
 
-    def test_resolve_should_resolve_with_singleton_captive_scoped_dependency_when_permitted(self):
+    def test_resolve_should_resolve_with_singleton_to_scoped_dependency_when_permitted(self):
         """Asserts that a singleton injectable that has a scoped dependency
         resolves just fine when permitted via the lifetime scope options.
         """
@@ -120,7 +135,21 @@ class LifetimeScopeTests(unittest.TestCase):
         catalog = InjectableCatalog(registrations)
         scope = LifetimeScope(catalog, options)
 
-        instance = scope.resolve(CaptiveScopedDependency)
+        instance = scope.resolve(SingletonToScopedDependency)
+
+        self.assertIsNotNone(instance)
+
+    def test_resolve_should_resolve_with_scoped_to_transient_dependency_when_permitted(self):
+        """Asserts that a scoped injectable that has a transient dependency
+        resolves just fine when permitted via the lifetime scope options.
+        """
+
+        registrations = find_injectables("tests.unit.test_injectables")
+        options = LifetimeScopeOptions(raise_on_captive_dependency=False)
+        catalog = InjectableCatalog(registrations)
+        scope = LifetimeScope(catalog, options)
+
+        instance = scope.resolve(ScopedToTransientDependency)
 
         self.assertIsNotNone(instance)
 

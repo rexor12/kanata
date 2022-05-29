@@ -13,6 +13,12 @@ import structlog
 
 DEFAULT_OPTIONS: LifetimeScopeOptions = LifetimeScopeOptions()
 
+SCOPE_TYPE_RANKS: Dict[InjectableScopeType, int] = {
+    InjectableScopeType.TRANSIENT: 0,
+    InjectableScopeType.SCOPED: 1,
+    InjectableScopeType.SINGLETON: 2
+}
+
 class LifetimeScope(ILifetimeScope):
     """An injectable lifetime scope
     that manages the lifetimes of injectables
@@ -97,6 +103,13 @@ class LifetimeScope(ILifetimeScope):
             return (args[0], True)
         return (contract, False)
 
+    @staticmethod
+    def __is_captive_dependency(
+        dependee_scope: InjectableScopeType,
+        dependent_scope: InjectableScopeType) -> bool:
+        ranked_scopes = sorted((dependee_scope, dependent_scope), key=lambda i: SCOPE_TYPE_RANKS[i])
+        return ranked_scopes[0] != dependee_scope
+
     def __build_dependency_graph_for(self, injectable: Type[Any]) -> BidirectedGraph[Type[Any]]:
         graph: BidirectedGraph[Type[Any]] = BidirectedGraph()
         injectables_to_resolve: List[Type[Any]] = [injectable]
@@ -157,8 +170,7 @@ class LifetimeScope(ILifetimeScope):
             registration.scope,
             lambda _: {})
         instances_by_injectable = get_or_add(scope_by_injectable, injectable, lambda _: set())
-        if (registration.scope == InjectableScopeType.SINGLETON
-            or registration.scope == InjectableScopeType.SCOPED):
+        if registration.scope in (InjectableScopeType.SINGLETON, InjectableScopeType.SCOPED):
             if len(instances_by_injectable) > 0:
                 return next(iter(instances_by_injectable))
 
@@ -175,8 +187,7 @@ class LifetimeScope(ILifetimeScope):
             registrations = self.__catalog.get_registrations_by_contract(dependent_contract)
             candidate_instances = []
             for registration in registrations:
-                if (dependee_scope == InjectableScopeType.SINGLETON
-                    and registration.scope != InjectableScopeType.SINGLETON):
+                if LifetimeScope.__is_captive_dependency(dependee_scope, registration.scope):
                     self.__on_captive_dependency_detected(injectable, dependent_contract)
 
                 scope = get_or_add(self.__instances_by_injectable, registration.scope, lambda _: {})
