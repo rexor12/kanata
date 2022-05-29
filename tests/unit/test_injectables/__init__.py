@@ -1,6 +1,7 @@
 from .captive_dependency import CaptiveDependency
 from .inon_dependee import INonDependee
 from .iroot import IRoot
+from .iscoped import IScoped
 from .isingleton import ISingleton
 from .itransient1 import ITransient1
 from .itransient2 import ITransient2
@@ -8,6 +9,7 @@ from .iunused import IUnused
 from .missing_multiple_dependencies import MissingMultipleDependencies
 from .missing_single_dependency import MissingSingleDependency
 from .root import Root
+from .scoped import Scoped
 from .singleton import Singleton
 from .transient1 import Transient1
 from .transient2 import Transient2

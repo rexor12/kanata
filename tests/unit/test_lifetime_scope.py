@@ -1,6 +1,6 @@
 from .test_injectables import (
     CaptiveDependency, MissingMultipleDependencies, MissingSingleDependency,
-    Singleton, Root, Transient1, Transient2
+    Scoped, Singleton, Root, Transient1, Transient2
 )
 from kanata import InjectableCatalog, LifetimeScope, find_injectables
 from kanata.exceptions import DependencyResolutionException
@@ -128,6 +128,45 @@ class LifetimeScopeTests(unittest.TestCase):
         assert_contains(instance.injectables2, lambda i: type(i) == Transient2)
         assert_contains(instance.injectables2, lambda i: type(i) == Singleton)
         # pylint: enable=unidiomatic-typecheck
+
+    def test_resolve_scoped_injectable_twice_returns_the_same_instance(self):
+        """Asserts that the child lifetime scope creates a new instance of a scoped injectable."""
+
+        registrations = find_injectables("tests.unit.test_injectables")
+        catalog = InjectableCatalog(registrations)
+        scope = LifetimeScope(catalog)
+
+        scoped1 = scope.resolve(Scoped)
+        scoped2 = scope.resolve(Scoped)
+
+        self.assertEqual(scoped1, scoped2)
+
+    def test_resolve_of_child_scope_returns_the_same_singleton_as_parent(self):
+        """Asserts that the child lifetime scope returns the same instance
+        of a singleton as the parent lifetime scope."""
+
+        registrations = find_injectables("tests.unit.test_injectables")
+        catalog = InjectableCatalog(registrations)
+        parent_scope = LifetimeScope(catalog)
+        child_scope = parent_scope.create_child_scope()
+
+        parent_singleton = parent_scope.resolve(Singleton)
+        child_singleton = child_scope.resolve(Singleton)
+
+        self.assertEqual(parent_singleton, child_singleton)
+
+    def test_resolve_of_child_scope_returns_different_scoped_instance_than_parent(self):
+        """Asserts that the child lifetime scope creates a new instance of a scoped injectable."""
+
+        registrations = find_injectables("tests.unit.test_injectables")
+        catalog = InjectableCatalog(registrations)
+        parent_scope = LifetimeScope(catalog)
+        child_scope = parent_scope.create_child_scope()
+
+        parent_scoped = parent_scope.resolve(Scoped)
+        child_scoped = child_scope.resolve(Scoped)
+
+        self.assertNotEqual(parent_scoped, child_scoped)
 
 if __name__ == "__main__":
     unittest.main()
