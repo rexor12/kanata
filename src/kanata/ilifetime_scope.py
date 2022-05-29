@@ -1,4 +1,3 @@
-from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import Type, TypeVar
 
@@ -19,15 +18,4 @@ class ILifetimeScope(metaclass=ABCMeta):
         :raises DependencyResolutionException: Raised when dependency resolution fails.
         :return: An instance of the appropriate injectable.
         :rtype: TInjectable
-        """
-
-    @abstractmethod
-    def create_child_scope(self) -> ILifetimeScope:
-        """Creates a lifetime scoped attached to the current one.
-        This child will have access to the same injectable catalog,
-        as well as singleton instances. Scoped instances will die
-        along with this child.
-
-        :return: A lifetime scope attached to the current lifetime scope.
-        :rtype: ILifetimeScope
         """
