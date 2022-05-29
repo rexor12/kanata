@@ -5,8 +5,9 @@
 **Kanata** is a very simple dependency injection framework used for decoupling the services of your Python application's services from their dependencies. This may help with maintainability, testability and readability.
 
 Currently, the following lifetime scopes are supported:
-* **Transient:** On each request, a new instance of the specific dependency is created.
-* **Singleton:** On the first request, a new instance is created and this same instance is returned on further requests.
+* **Transient:** On each request, a new instance of the specific dependency is created. Typically, a transient injectable maintains its own state.
+* **Scoped:** On the first request, a new instance is created for a particular lifetime scope and this same instance is returned on further requests. Typically, a scoped injectable is used for separating instances between incoming web requests.
+* **Singleton:** On the first request, a new instance is created and this same instance is returned on further requests to any of the lifetime scopes in a tree.
 
 # Requirements
 
