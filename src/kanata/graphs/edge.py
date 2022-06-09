@@ -38,6 +38,8 @@ class Edge(Generic[TNode]):
         return self.__target
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Edge):
-            return False
-        return self.__source == other.source and self.__target == other.target
+        return (
+            self.__source == other.source and self.__target == other.target
+            if isinstance(other, Edge)
+            else False
+        )

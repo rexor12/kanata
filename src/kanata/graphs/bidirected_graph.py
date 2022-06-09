@@ -20,7 +20,7 @@ class BidirectedGraph(Graph[TNode]):
         :rtype: Generator[Edge[TNode], None, None]
         """
 
-        if not node in self:
+        if node not in self:
             raise ArgumentException("node", node, "The specified node is not in the graph.")
 
         for edge in self.edges:

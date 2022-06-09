@@ -17,14 +17,14 @@ def topological_sort(graph: BidirectedGraph[TNode], start_node: TNode) -> Tuple[
     :rtype: Tuple[TNode, ...]
     """
 
-    if not start_node in graph:
+    if start_node not in graph:
         raise ArgumentException("start_node", start_node, f"The start node '{start_node}' is not in the graph.")
 
     visited_nodes: Set[TNode] = set()
     unvisited_nodes: Set[TNode] = graph.nodes
     sorted_nodes: List[TNode] = []
     __visit(graph, start_node, visited_nodes, set(), sorted_nodes)
-    if not visited_nodes == unvisited_nodes:
+    if visited_nodes != unvisited_nodes:
         raise DisconnectedSubGraphException(tuple(str(node) for node in unvisited_nodes))
     return tuple(sorted_nodes)
 
@@ -35,7 +35,7 @@ def __visit(graph: BidirectedGraph[TNode], node: TNode, visited_nodes: Set[TNode
         raise CyclicGraphException(currently_visiting, "A directed acyclic graph (DAG) is expected.")
 
     currently_visiting.add(node)
-    for out_node in set(edge.target for edge in graph.get_out_edges(node)):
+    for out_node in {edge.target for edge in graph.get_out_edges(node)}:
         __visit(graph, out_node, visited_nodes, currently_visiting, sorted_nodes)
     currently_visiting.remove(node)
 

@@ -34,7 +34,7 @@ def assert_contains_all(iterable: Iterable[T], items: Iterable[T]) -> None:
     """
 
     for item in items:
-        if not item in iterable:
+        if item not in iterable:
             raise AssertionError((
                 "Expected the list to contain all items,"
                 " but some weren't found."
