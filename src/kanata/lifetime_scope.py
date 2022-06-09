@@ -113,7 +113,7 @@ class LifetimeScope(ILifetimeScope):
     def __build_dependency_graph_for(self, injectable: Type[Any]) -> BidirectedGraph[Type[Any]]:
         graph: BidirectedGraph[Type[Any]] = BidirectedGraph()
         injectables_to_resolve: List[Type[Any]] = [injectable]
-        while (len(injectables_to_resolve)) > 0:
+        while injectables_to_resolve:
             dependee_injectable = injectables_to_resolve.pop()
             if not graph.try_add_node(dependee_injectable):
                 # This type's dependency chain has already been mapped.
@@ -170,9 +170,12 @@ class LifetimeScope(ILifetimeScope):
             registration.scope,
             lambda _: {})
         instances_by_injectable = get_or_add(scope_by_injectable, injectable, lambda _: set())
-        if registration.scope in (InjectableScopeType.SINGLETON, InjectableScopeType.SCOPED):
-            if len(instances_by_injectable) > 0:
-                return next(iter(instances_by_injectable))
+        if (
+            registration.scope
+            in (InjectableScopeType.SINGLETON, InjectableScopeType.SCOPED)
+            and len(instances_by_injectable) > 0
+        ):
+            return next(iter(instances_by_injectable))
 
         instance = self.__create_instance(injectable, registration.scope)
         self.__log.debug("Instantiated injectable", injectable=injectable)

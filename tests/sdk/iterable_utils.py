@@ -16,10 +16,7 @@ def all_true(iterable: Iterable[T], predicate: Callable[[T], bool]) -> bool:
     :rtype: bool
     """
 
-    for item in iterable:
-        if not predicate(item):
-            return False
-    return True
+    return all(predicate(item) for item in iterable)
 
 def first(iterable: Iterable[T], predicate: Callable[[T], bool], **kwargs: Any) -> T:
     """Gets the first item from the specified iterable that

@@ -22,7 +22,7 @@ def find_injectables(module_name: str) -> Tuple[InjectableRegistration, ...]:
     logger = structlog.get_logger(LOGGER_NAME)
     registrations: List[InjectableRegistration] = []
     module_names: List[str] = [module_name]
-    while len(module_names) > 0:
+    while module_names:
         module_name = module_names.pop()
         logger.debug("Loading module", name=module_name)
         module = importlib.import_module(module_name)

@@ -19,7 +19,7 @@ def get_or_add(dictionary: Dict[TKey, TValue], key: TKey, value_factory: Callabl
     :rtype: TValue
     """
 
-    existing_value = dictionary.get(key, None)
+    existing_value = dictionary.get(key)
     if not existing_value:
         dictionary[key] = existing_value = value_factory(key)
     return existing_value

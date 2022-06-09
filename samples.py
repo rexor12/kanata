@@ -22,7 +22,7 @@ def print_valid_samples() -> None:
 if __name__ == "__main__":
     print("Press Ctrl+C to exit at any time.")
     print_valid_samples()
-    while not (selected_sample := input("Selected sample: ")) in VALID_SAMPLES:
+    while (selected_sample := input("Selected sample: ")) not in VALID_SAMPLES:
         print_valid_samples()
 
     try:
