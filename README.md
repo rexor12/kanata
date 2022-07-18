@@ -1,6 +1,8 @@
 # Welcome
 
 [![PyPI version](https://badge.fury.io/py/kanata.svg)](https://badge.fury.io/py/kanata)
+[![CodeFactor](https://www.codefactor.io/repository/github/rexor12/kanata/badge/main)](https://www.codefactor.io/repository/github/rexor12/kanata/overview/main)
+[![Shilds](https://img.shields.io/github/license/rexor12/kanata)](https://img.shields.io/github/license/rexor12/kanata)
 
 **Kanata** is a very simple dependency injection framework used for decoupling the services of your Python application's services from their dependencies. This may help with maintainability, testability and readability.
 

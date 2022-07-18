@@ -1,7 +1,7 @@
 from .test_injectables import (
     MissingMultipleDependencies, MissingSingleDependency, Scoped, ScopedToTransientDependency,
     Singleton, SingletonToScopedDependency, SingletonToTransientDependency, Root,
-    Transient1, Transient2
+    Transient1, Transient2, ProtocolImpl, ProtocolDependent
 )
 from kanata import InjectableCatalog, LifetimeScope, find_injectables
 from kanata.exceptions import DependencyResolutionException
@@ -227,6 +227,21 @@ class LifetimeScopeTests(unittest.TestCase):
         child_scoped = child_scope.resolve(Scoped)
 
         self.assertNotEqual(parent_scoped, child_scoped)
+
+    def test_resolve_should_resolve_by_protocol(self):
+        """Asserts that the lifetime scope correctly resolves a type
+        that implements a protocol.
+        """
+
+        registrations = find_injectables("tests.unit.test_injectables")
+        catalog = InjectableCatalog(registrations)
+        scope = LifetimeScope(catalog)
+
+        instance = scope.resolve(ProtocolDependent)
+
+        self.assertIsNotNone(instance)
+        self.assertIsInstance(instance, ProtocolDependent)
+        self.assertIsInstance(instance.injected, ProtocolImpl)
 
 if __name__ == "__main__":
     unittest.main()

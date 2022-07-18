@@ -86,22 +86,26 @@ class LifetimeScope(ILifetimeScope):
 
     @staticmethod
     def __unpack_dependent_intf(contract: Type[Any]) -> Tuple[Type[Any], bool]:
-        # The dependency must be either a specific contract (single instance dependency)
-        # or a tuple of a single specific contract (multiple instance dependency).
-        if (origin := getattr(contract, "__origin__", None)) is not None:
-            if origin != tuple:
-                raise DependencyResolutionException(
-                    contract,
-                    f"Expected a tuple, but got {origin}."
-                )
-            args = get_args(contract)
-            if len(args) != 2 or args[-1] != Ellipsis:
-                raise DependencyResolutionException(
-                    contract,
-                    "Expected a tuple with two arguments, the second being an ellipsis."
-                )
-            return (args[0], True)
-        return (contract, False)
+        if (
+            getattr(contract, "_is_protocol", False) # typing.Protocol
+            or getattr(contract, "__abstractmethods__", None) # abc.ABCMeta
+            or (origin := getattr(contract, "__origin__", None)) is None
+        ):
+            return (contract, False)
+
+        if origin is not tuple:
+            raise DependencyResolutionException(
+                contract,
+                f"Expected a tuple, but got {origin} for contract {contract}."
+            )
+
+        args = get_args(contract)
+        if len(args) != 2 or args[-1] != Ellipsis:
+            raise DependencyResolutionException(
+                contract,
+                "Expected a tuple with two arguments, the second being an ellipsis."
+            )
+        return (args[0], True)
 
     @staticmethod
     def __is_captive_dependency(
@@ -158,7 +162,7 @@ class LifetimeScope(ILifetimeScope):
                 injectable,
                 (
                     f"Cannot find the registration for injectable '{injectable}'."
-                    " This is likely an error in the algorithm."
+                    " It is possible that this type is not an injectable."
                 )
             )
 
