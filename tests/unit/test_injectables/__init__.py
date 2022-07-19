@@ -7,6 +7,9 @@ from .itransient2 import ITransient2
 from .iunused import IUnused
 from .missing_multiple_dependencies import MissingMultipleDependencies
 from .missing_single_dependency import MissingSingleDependency
+from .protocol_dependent import ProtocolDependent
+from .protocol_impl import ProtocolImpl
+from .protocol_interface import ProtocolInterface
 from .root import Root
 from .scoped import Scoped
 from .scoped_to_transient_dependency import ScopedToTransientDependency
