@@ -30,7 +30,7 @@ class LifetimeScope(ILifetimeScope):
                  **kwargs: Any) -> None:
         self.__catalog: IInjectableCatalog = catalog
         self.__options: LifetimeScopeOptions = options
-        self.__log = structlog.get_logger(LOGGER_NAME)
+        self.__log = structlog.get_logger(logger_name=LOGGER_NAME)
         self.__instances_by_injectable: Dict[InjectableScopeType, Dict[Type[Any], Set[Any]]] = {}
         self.__parent: Optional[ILifetimeScope] = None
 
