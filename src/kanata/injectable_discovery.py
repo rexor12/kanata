@@ -19,7 +19,7 @@ def find_injectables(module_name: str) -> Tuple[InjectableRegistration, ...]:
     :rtype: Tuple[InjectableRegistration, ...]
     """
 
-    logger = structlog.get_logger(LOGGER_NAME)
+    logger = structlog.get_logger(logger_name=LOGGER_NAME)
     registrations: List[InjectableRegistration] = []
     module_names: List[str] = [module_name]
     while module_names:
