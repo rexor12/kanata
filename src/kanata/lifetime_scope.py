@@ -1,3 +1,9 @@
+import inspect
+from collections.abc import Generator
+from typing import Any, get_args
+
+import structlog
+
 from .constants import LOGGER_NAME
 from .exceptions import DependencyResolutionException
 from .graphs import BidirectedGraph
@@ -6,14 +12,10 @@ from .iinjectable_catalog import IInjectableCatalog
 from .ilifetime_scope import ILifetimeScope, TInjectable
 from .models import InjectableScopeType, LifetimeScopeOptions
 from .utils import get_or_add
-from typing import Any, Dict, Generator, List, Optional, Set, Tuple, Type, get_args
-
-import inspect
-import structlog
 
 DEFAULT_OPTIONS: LifetimeScopeOptions = LifetimeScopeOptions()
 
-SCOPE_TYPE_RANKS: Dict[InjectableScopeType, int] = {
+SCOPE_TYPE_RANKS: dict[InjectableScopeType, int] = {
     InjectableScopeType.TRANSIENT: 0,
     InjectableScopeType.SCOPED: 1,
     InjectableScopeType.SINGLETON: 2
@@ -27,19 +29,14 @@ class LifetimeScope(ILifetimeScope):
     def __init__(self,
                  catalog: IInjectableCatalog,
                  options: LifetimeScopeOptions = DEFAULT_OPTIONS,
-                 **kwargs: Any) -> None:
+                 _parent: ILifetimeScope | None = None) -> None:
         self.__catalog: IInjectableCatalog = catalog
         self.__options: LifetimeScopeOptions = options
         self.__log = structlog.get_logger(logger_name=LOGGER_NAME)
-        self.__instances_by_injectable: Dict[InjectableScopeType, Dict[Type[Any], Set[Any]]] = {}
-        self.__parent: Optional[ILifetimeScope] = None
+        self.__instances_by_injectable: dict[InjectableScopeType, dict[type[Any], set[Any]]] = {}
+        self.__parent: ILifetimeScope | None = _parent
 
-        if (parent := kwargs.get("parent", None)) is not None:
-            if not isinstance(parent, ILifetimeScope):
-                raise ValueError("The parent must be an instance of ILifetimeScope.")
-            self.__parent = parent
-
-    def resolve(self, injectable: Type[TInjectable]) -> TInjectable:
+    def resolve(self, injectable: type[TInjectable]) -> TInjectable:
         registration = self.__catalog.get_registration_by_injectable(injectable)
         if (registration is not None
             and registration.scope == InjectableScopeType.SINGLETON
@@ -65,11 +62,11 @@ class LifetimeScope(ILifetimeScope):
         return instance
 
     def create_child_scope(self) -> ILifetimeScope:
-        return LifetimeScope(self.__catalog, self.__options, parent=self)
+        return LifetimeScope(self.__catalog, self.__options, _parent=self)
 
     @staticmethod
     def __get_dependent_contracts(
-        injectable: Type[Any]) -> Generator[Tuple[Type[Any], bool], None, None]:
+        injectable: type[Any]) -> Generator[tuple[type[Any], bool], None, None]:
         constructor = getattr(injectable, "__init__", None)
         if not constructor or not callable(constructor):
             raise DependencyResolutionException(injectable, "Invalid constructor.")
@@ -85,7 +82,7 @@ class LifetimeScope(ILifetimeScope):
             yield LifetimeScope.__unpack_dependent_intf(descriptor.annotation)
 
     @staticmethod
-    def __unpack_dependent_intf(contract: Type[Any]) -> Tuple[Type[Any], bool]:
+    def __unpack_dependent_intf(contract: type[Any]) -> tuple[type[Any], bool]:
         if (
             getattr(contract, "_is_protocol", False) # typing.Protocol
             or getattr(contract, "__abstractmethods__", None) # abc.ABCMeta
@@ -114,9 +111,9 @@ class LifetimeScope(ILifetimeScope):
         ranked_scopes = sorted((dependee_scope, dependent_scope), key=lambda i: SCOPE_TYPE_RANKS[i])
         return ranked_scopes[0] != dependee_scope
 
-    def __build_dependency_graph_for(self, injectable: Type[Any]) -> BidirectedGraph[Type[Any]]:
-        graph: BidirectedGraph[Type[Any]] = BidirectedGraph()
-        injectables_to_resolve: List[Type[Any]] = [injectable]
+    def __build_dependency_graph_for(self, injectable: type[Any]) -> BidirectedGraph[type[Any]]:
+        graph: BidirectedGraph[type[Any]] = BidirectedGraph()
+        injectables_to_resolve: list[type[Any]] = [injectable]
         while injectables_to_resolve:
             dependee_injectable = injectables_to_resolve.pop()
             if not graph.try_add_node(dependee_injectable):
@@ -155,7 +152,7 @@ class LifetimeScope(ILifetimeScope):
 
         return graph
 
-    def __resolve_injectable(self, injectable: Type[Any]) -> Any:
+    def __resolve_injectable(self, injectable: type[Any]) -> Any:
         registration = self.__catalog.get_registration_by_injectable(injectable)
         if not registration:
             raise DependencyResolutionException(
@@ -187,7 +184,7 @@ class LifetimeScope(ILifetimeScope):
 
         return instance
 
-    def __create_instance(self, injectable: Type[Any], dependee_scope: InjectableScopeType) -> Any:
+    def __create_instance(self, injectable: type[Any], dependee_scope: InjectableScopeType) -> Any:
         dependent_contracts = LifetimeScope.__get_dependent_contracts(injectable)
         dependent_injectables = []
         for dependent_contract, is_multi in dependent_contracts:
@@ -215,7 +212,7 @@ class LifetimeScope(ILifetimeScope):
 
         return injectable(*dependent_injectables)
 
-    def __on_captive_dependency_detected(self, injectable: Type[Any], contract: Type[Any]) -> None:
+    def __on_captive_dependency_detected(self, injectable: type[Any], contract: type[Any]) -> None:
         # Unless turned off, issue a warning, because a captive dependency
         # may be the result of a coding error, as it's generally undesirable.
         error_message = (

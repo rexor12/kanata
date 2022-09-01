@@ -1,8 +1,9 @@
+from collections.abc import Generator
+
+from kanata.exceptions import ArgumentException
 from .edge import Edge
 from .graph import Graph
 from .tnode import TNode
-from ..exceptions import ArgumentException
-from typing import Generator
 
 class BidirectedGraph(Graph[TNode]):
     """A type of graph whose edges specify a direction between nodes."""

@@ -1,9 +1,9 @@
-from typing import Any, Optional
+from typing import Any
 
 class ArgumentException(Exception):
     """Raised when a method is invoked with an invalid argument."""
 
-    def __init__(self, name: str, value: Any, message: Optional[str] = None) -> None:
+    def __init__(self, name: str, value: Any, message: str | None = None) -> None:
         """Initializes a new instance.
 
         :param name: The name of the argument.

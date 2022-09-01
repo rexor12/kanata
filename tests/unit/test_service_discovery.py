@@ -1,14 +1,15 @@
-from kanata import find_injectables
+import unittest
+from typing import Any
+
 from tests.sdk import assert_contains_all, first
 from tests.unit.test_injectables import (
-    INonDependee, IRoot, IScoped, ISingleton, ITransient1, ITransient2,
-    SingletonToScopedDependency, SingletonToTransientDependency, MissingMultipleDependencies,
-    MissingSingleDependency, ProtocolDependent, ProtocolImpl, ProtocolInterface, Root,
-    Scoped, Singleton, Transient1, Transient2, ScopedToTransientDependency
+    INonDependee, IRoot, IScoped, ISingleton, ITransient1, ITransient2, MissingMultipleDependencies,
+    MissingSingleDependency, ProtocolDependent, ProtocolImpl, ProtocolInterface, Root, Scoped,
+    ScopedToTransientDependency, Singleton, SingletonToScopedDependency,
+    SingletonToTransientDependency, Transient1, Transient2
 )
-from typing import Any, Dict, Tuple, Type
 
-import unittest
+from kanata import find_injectables
 
 class ServiceDiscoveryTests(unittest.TestCase):
     """Unit tests for service discovery."""
@@ -16,7 +17,7 @@ class ServiceDiscoveryTests(unittest.TestCase):
     def test_find_injectables_should_find_all_injectables_recursively(self):
         """Asserts that all injectables are discovered in a specific module."""
 
-        expected_types: Dict[Type[Any], Tuple[Type[Any], ...]] = {
+        expected_types: dict[type[Any], tuple[type[Any], ...]] = {
             Root: (IRoot,),
             Singleton: (ITransient1, ITransient2, ISingleton),
             Transient1: (ITransient1,),

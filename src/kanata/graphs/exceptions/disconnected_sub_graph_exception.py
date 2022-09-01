@@ -1,24 +1,24 @@
-from typing import Any, Tuple
+from typing import Any
 
 class DisconnectedSubGraphException(Exception):
     """Raised when a disconnected sub-graph is detected in a graph that doesn't allow it."""
 
-    def __init__(self, nodes: Tuple[Any, ...], *args: object) -> None:
+    def __init__(self, nodes: tuple[Any, ...], *args: object) -> None:
         """Initializes a new instance.
 
         :param nodes: The list of nodes that form the disconnected sub-graph.
-        :type nodes: Tuple[Any, ...]
+        :type nodes: tuple[Any, ...]
         """
 
         super().__init__(*args)
-        self.__nodes: Tuple[Any, ...] = nodes
-    
+        self.__nodes: tuple[Any, ...] = nodes
+
     @property
-    def nodes(self) -> Tuple[Any, ...]:
+    def nodes(self) -> tuple[Any, ...]:
         """Gets the list of nodes that form the disconnected sub-graph.
 
         :return: The list of nodes that form the disconnected sub-graph.
-        :rtype: Tuple[Any, ...]
+        :rtype: tuple[Any, ...]
         """
 
         return self.__nodes

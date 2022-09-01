@@ -1,7 +1,8 @@
+from typing import Generic
+
 from .edge import Edge
-from .tnode import TNode
 from .exceptions import DuplicateEdgeException, DuplicateNodeException
-from typing import Generic, List, Set, Tuple
+from .tnode import TNode
 
 class Graph(Generic[TNode]):
     """A basic, non-directed graph that consists of nodes and edges between them."""
@@ -14,8 +15,8 @@ class Graph(Generic[TNode]):
         """
 
         self.__allow_parallel_edges: bool = allow_parallel_edges
-        self.__nodes: Set[TNode] = set()
-        self.__edges: List[Edge[TNode]] = []
+        self.__nodes: set[TNode] = set()
+        self.__edges: list[Edge[TNode]] = []
 
     @property
     def allow_parallel_edges(self) -> bool:
@@ -28,21 +29,21 @@ class Graph(Generic[TNode]):
         return self.__allow_parallel_edges
 
     @property
-    def nodes(self) -> Set[TNode]:
+    def nodes(self) -> set[TNode]:
         """Gets the set of nodes this graphs consist of.
 
         :return: The set of nodes this graphs consist of.
-        :rtype: Set[TNode]
+        :rtype: set[TNode]
         """
 
         return self.__nodes.copy()
 
     @property
-    def edges(self) -> Tuple[Edge[TNode], ...]:
+    def edges(self) -> tuple[Edge[TNode], ...]:
         """Gets the collection of edges between the nodes.
 
         :return: The collection of edges between the nodes.
-        :rtype: Tuple[Edge[TNode], ...]
+        :rtype: tuple[Edge[TNode], ...]
         """
 
         return tuple(self.__edges)

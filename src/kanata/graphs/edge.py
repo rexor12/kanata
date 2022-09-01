@@ -1,5 +1,6 @@
-from .tnode import TNode
 from typing import Generic
+
+from .tnode import TNode
 
 class Edge(Generic[TNode]):
     """Defines an edge between two nodes of a graph."""
