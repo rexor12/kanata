@@ -1,27 +1,26 @@
 from __future__ import annotations
-from abc import ABCMeta, abstractmethod
-from typing import Type, TypeVar
+
+from typing import Protocol, TypeVar
 
 TInjectable = TypeVar("TInjectable")
 
-class ILifetimeScope(metaclass=ABCMeta):
+class ILifetimeScope(Protocol):
     """Interface for an injectable lifetime scope
     that manages the lifetimes of injectables
     and provides access to them.
     """
 
-    @abstractmethod
-    def resolve(self, injectable: Type[TInjectable]) -> TInjectable:
+    def resolve(self, injectable: type[TInjectable]) -> TInjectable:
         """Resolves an instance of an injectable associated to the specified interface.
 
         :param injectable: The injectable for which to get a resolved instance.
-        :type injectable: Type[TInjectable]
+        :type injectable: type[TInjectable]
         :raises DependencyResolutionException: Raised when dependency resolution fails.
         :return: An instance of the appropriate injectable.
         :rtype: TInjectable
         """
+        ...
 
-    @abstractmethod
     def create_child_scope(self) -> ILifetimeScope:
         """Creates a lifetime scoped attached to the current one.
         This child will have access to the same injectable catalog,
@@ -31,3 +30,4 @@ class ILifetimeScope(metaclass=ABCMeta):
         :return: A lifetime scope attached to the current lifetime scope.
         :rtype: ILifetimeScope
         """
+        ...

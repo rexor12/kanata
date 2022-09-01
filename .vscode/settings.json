@@ -1,16 +1,33 @@
 {
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": true
+    },
+    "editor.formatOnSave": false,
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+    "files.trimFinalNewlines": true,
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.diagnosticMode": "workspace",
     "python.linting.enabled": true,
     "python.linting.pylintEnabled": true,
     "python.linting.pylintArgs": [
         "--disable=missing-module-docstring,too-few-public-methods,wrong-import-order",
         "--max-line-length=100"
     ],
-    "python.analysis.typeCheckingMode": "basic",
     "python.autoComplete.extraPaths": [
         "./src/kanata"
     ],
     "python.analysis.extraPaths": [
         "./src/kanata",
         "./samples"
+    ],
+    "python.sortImports.args": [
+        "--project", "kanata",
+        "--line-length", "100",
+        "--lines-after-imports", "1",
+        "--multi-line", "5",
+        "--no-lines-before", "LOCALFOLDER",
+        "--combine-as",
+        "--use-parentheses"
     ]
 }
