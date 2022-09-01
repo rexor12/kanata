@@ -1,6 +1,7 @@
 """Contains additional assertions."""
 
-from typing import Any, Callable, Iterable, Set, TypeVar
+from collections.abc import Callable, Iterable
+from typing import Any, TypeVar
 
 T = TypeVar("T")
 
@@ -50,7 +51,7 @@ def assert_contains_unique(iterable: Iterable[T], projection: Callable[[T], Any]
     :raises AssertionError: Raised when the iterable has one or more duplicate items.
     """
 
-    checked_items: Set[Any] = set()
+    checked_items: set[Any] = set()
     for item in iterable:
         projected_item = projection(item)
         if projected_item in checked_items:

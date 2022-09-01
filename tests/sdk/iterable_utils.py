@@ -1,6 +1,7 @@
 """Utility methods for iterables."""
 
-from typing import Any, Callable, Iterable, TypeVar
+from collections.abc import Callable, Iterable
+from typing import Any, TypeVar
 
 T = TypeVar("T")
 
