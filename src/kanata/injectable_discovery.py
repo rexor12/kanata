@@ -44,12 +44,9 @@ def find_injectables(module_name: str) -> tuple[InjectableRegistration, ...]:
 def __get_registrations(module: ModuleType, logger: Any) -> tuple[InjectableRegistration, ...]:
     registrations: list[InjectableRegistration] = []
     for _, obj in inspect.getmembers(module, inspect.isclass):
-        local_registration: InjectableRegistration | None = getattr(
-            obj,
-            InjectableRegistration.PROPERTY_NAME,
-            None
-        )
-        if local_registration:
+        if local_registration := getattr(
+            obj, InjectableRegistration.PROPERTY_NAME, None
+        ):
             logger.debug("Found injectable", type=local_registration.injectable_type)
             registrations.append(local_registration)
 
