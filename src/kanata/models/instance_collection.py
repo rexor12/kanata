@@ -21,7 +21,7 @@ class InstanceCollection(IInstanceCollection):
         if not (injectables_by_contract := self.__instances.get(scope_type)):
             return
 
-        yield from injectables_by_contract.get(contract_type, tuple())
+        yield from injectables_by_contract.get(contract_type, ())
 
     def add_instance(
         self,

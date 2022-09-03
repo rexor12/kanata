@@ -9,6 +9,7 @@ from tests.unit.test_injectables import (
 )
 
 from kanata import find_injectables
+from kanata.models import InjectableTypeRegistration
 
 class ServiceDiscoveryTests(unittest.TestCase):
     """Unit tests for service discovery."""
@@ -35,7 +36,13 @@ class ServiceDiscoveryTests(unittest.TestCase):
 
         self.assertEqual(len(registrations), len(expected_types))
         for injectable, contracts in expected_types.items():
-            registration = first(registrations, lambda i, t=injectable: i.injectable_type == t)
+            registration = first(
+                registrations,
+                lambda i, t=injectable: (
+                    isinstance(i, InjectableTypeRegistration)
+                    and i.injectable_type == t
+                )
+            )
             self.assertEqual(len(contracts), len(registration.contract_types))
             assert_contains_all(registration.contract_types, contracts)
 

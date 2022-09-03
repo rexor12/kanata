@@ -1,5 +1,6 @@
 from kanata import LifetimeScope, find_injectables
 from kanata.catalogs import InjectableCatalog
+from kanata.models import InjectableInstanceRegistration, InjectableTypeRegistration
 from .calculator import Calculator
 
 def run() -> None:
@@ -9,7 +10,14 @@ def run() -> None:
     catalog = InjectableCatalog(find_injectables("samples.calculator"))
     print("Found the following registrations:")
     for registration in catalog.get_registrations():
-        print(f"{registration.injectable_type} registered as: {registration.contract_types}")
+        match registration:
+            case InjectableTypeRegistration():
+                injectable_type = registration.injectable_type
+            case InjectableInstanceRegistration():
+                injectable_type = type(registration.injectable_instance)
+            case _:
+                raise ValueError(f"Unknown registration type '{type(registration)}'.")
+        print(f"{injectable_type} registered as: {registration.contract_types}")
 
     # Create a lifetime scope that will hold our injectable instances.
     scope = LifetimeScope(catalog)
