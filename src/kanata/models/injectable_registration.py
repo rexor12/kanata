@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from .injectable_scope_type import InjectableScopeType
 
@@ -11,10 +11,10 @@ class InjectableRegistration:
     """The name of the property used to hold the list
     of registration objects attached to an injectable type."""
 
-    injectable_type: type[Any]
+    injectable_type: type
     """Gets or sets the type of the injectable object."""
 
-    contract_types: set[type[Any]] = field(default_factory=set)
+    contract_types: set[type] = field(default_factory=set)
     """Gets or sets the types of the contracts by which an instance of the object is injectable."""
 
     scope: InjectableScopeType = InjectableScopeType.TRANSIENT

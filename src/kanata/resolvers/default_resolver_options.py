@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
 @dataclass
-class LifetimeScopeOptions:
-    """Holds options for a lifetime scope."""
+class DefaultResolverOptions:
+    """Holds options for a default resolver."""
 
     suppress_captive_dependency_warnings: bool = False
     """Gets or sets whether to suppress warning logs about captive dependencies."""
