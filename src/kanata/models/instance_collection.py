@@ -15,15 +15,13 @@ class InstanceCollection(IInstanceCollection):
     ) -> Generator[Any, None, None]:
         if scope_type is None:
             for injectables_by_contract in self.__instances.values():
-                for instance in injectables_by_contract.get(contract_type, ()):
-                    yield instance
+                yield from injectables_by_contract.get(contract_type, ())
             return
 
         if not (injectables_by_contract := self.__instances.get(scope_type)):
             return
 
-        for instance in injectables_by_contract.get(contract_type, tuple()):
-            yield instance
+        yield from injectables_by_contract.get(contract_type, tuple())
 
     def add_instance(
         self,
