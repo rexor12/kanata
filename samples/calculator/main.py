@@ -1,5 +1,6 @@
+from kanata import LifetimeScope, find_injectables
+from kanata.catalogs import InjectableCatalog
 from .calculator import Calculator
-from kanata import InjectableCatalog, LifetimeScope, find_injectables
 
 def run() -> None:
     """Runs the sample."""

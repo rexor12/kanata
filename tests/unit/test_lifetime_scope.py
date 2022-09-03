@@ -1,14 +1,19 @@
-from .test_injectables import (
-    MissingMultipleDependencies, MissingSingleDependency, Scoped, ScopedToTransientDependency,
-    Singleton, SingletonToScopedDependency, SingletonToTransientDependency, Root,
-    Transient1, Transient2, ProtocolImpl, ProtocolDependent
-)
-from kanata import InjectableCatalog, LifetimeScope, find_injectables
-from kanata.exceptions import DependencyResolutionException
-from kanata.models import LifetimeScopeOptions
+import unittest
+from typing import TypeVar
+
 from tests.sdk import assert_contains, assert_contains_unique
 
-import unittest
+from kanata import LifetimeScope, find_injectables
+from kanata.catalogs import InjectableCatalog
+from kanata.exceptions import DependencyResolutionException
+from kanata.resolvers import DefaultResolver, DefaultResolverOptions
+from .test_injectables import (
+    MissingMultipleDependencies, MissingSingleDependency, ProtocolDependent, ProtocolImpl, Root,
+    Scoped, ScopedToTransientDependency, Singleton, SingletonToScopedDependency,
+    SingletonToTransientDependency, Transient1, Transient2
+)
+
+TInjectable = TypeVar("TInjectable")
 
 class LifetimeScopeTests(unittest.TestCase):
     """Unit tests for lifetime scopes."""
@@ -117,9 +122,9 @@ class LifetimeScopeTests(unittest.TestCase):
         """
 
         registrations = find_injectables("tests.unit.test_injectables")
-        options = LifetimeScopeOptions(raise_on_captive_dependency=False)
+        options = DefaultResolverOptions(raise_on_captive_dependency=False)
         catalog = InjectableCatalog(registrations)
-        scope = LifetimeScope(catalog, options)
+        scope = LifetimeScope(catalog, (DefaultResolver(options),))
 
         instance = scope.resolve(SingletonToTransientDependency)
 
@@ -131,9 +136,9 @@ class LifetimeScopeTests(unittest.TestCase):
         """
 
         registrations = find_injectables("tests.unit.test_injectables")
-        options = LifetimeScopeOptions(raise_on_captive_dependency=False)
+        options = DefaultResolverOptions(raise_on_captive_dependency=False)
         catalog = InjectableCatalog(registrations)
-        scope = LifetimeScope(catalog, options)
+        scope = LifetimeScope(catalog, (DefaultResolver(options),))
 
         instance = scope.resolve(SingletonToScopedDependency)
 
@@ -145,9 +150,9 @@ class LifetimeScopeTests(unittest.TestCase):
         """
 
         registrations = find_injectables("tests.unit.test_injectables")
-        options = LifetimeScopeOptions(raise_on_captive_dependency=False)
+        options = DefaultResolverOptions(raise_on_captive_dependency=False)
         catalog = InjectableCatalog(registrations)
-        scope = LifetimeScope(catalog, options)
+        scope = LifetimeScope(catalog, (DefaultResolver(options),))
 
         instance = scope.resolve(ScopedToTransientDependency)
 

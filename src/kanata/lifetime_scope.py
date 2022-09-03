@@ -1,40 +1,33 @@
-import inspect
-from collections.abc import Generator
-from typing import Any, get_args
+from typing import Any
 
 import structlog
 
+from kanata.catalogs import IInjectableCatalog
+from kanata.utils import get_dependent_contracts
 from .constants import LOGGER_NAME
 from .exceptions import DependencyResolutionException
 from .graphs import BidirectedGraph
 from .graphs.sorting import topological_sort
-from .iinjectable_catalog import IInjectableCatalog
 from .ilifetime_scope import ILifetimeScope, TInjectable
-from .models import InjectableScopeType, LifetimeScopeOptions
-from .utils import get_or_add
-
-DEFAULT_OPTIONS: LifetimeScopeOptions = LifetimeScopeOptions()
-
-SCOPE_TYPE_RANKS: dict[InjectableScopeType, int] = {
-    InjectableScopeType.TRANSIENT: 0,
-    InjectableScopeType.SCOPED: 1,
-    InjectableScopeType.SINGLETON: 2
-}
+from .models import InjectableScopeType, InstanceCollection
+from .resolvers import DefaultResolver, IResolver
 
 class LifetimeScope(ILifetimeScope):
     """An injectable lifetime scope
     that manages the lifetimes of injectables
     and provides access to them."""
 
-    def __init__(self,
-                 catalog: IInjectableCatalog,
-                 options: LifetimeScopeOptions = DEFAULT_OPTIONS,
-                 _parent: ILifetimeScope | None = None) -> None:
-        self.__catalog: IInjectableCatalog = catalog
-        self.__options: LifetimeScopeOptions = options
+    def __init__(
+        self,
+        catalog: IInjectableCatalog,
+        resolvers: tuple[IResolver, ...] | None = None,
+        _parent: ILifetimeScope | None = None
+    ) -> None:
+        self.__catalog = catalog
+        self.__resolvers: tuple[IResolver, ...] = resolvers or (DefaultResolver(),)
+        self.__parent = _parent
         self.__log = structlog.get_logger(logger_name=LOGGER_NAME)
-        self.__instances_by_injectable: dict[InjectableScopeType, dict[type[Any], set[Any]]] = {}
-        self.__parent: ILifetimeScope | None = _parent
+        self.__instances = InstanceCollection()
 
     def resolve(self, injectable: type[TInjectable]) -> TInjectable:
         registration = self.__catalog.get_registration_by_injectable(injectable)
@@ -62,58 +55,11 @@ class LifetimeScope(ILifetimeScope):
         return instance
 
     def create_child_scope(self) -> ILifetimeScope:
-        return LifetimeScope(self.__catalog, self.__options, _parent=self)
+        return LifetimeScope(self.__catalog, self.__resolvers, _parent=self)
 
-    @staticmethod
-    def __get_dependent_contracts(
-        injectable: type[Any]) -> Generator[tuple[type[Any], bool], None, None]:
-        constructor = getattr(injectable, "__init__", None)
-        if not constructor or not callable(constructor):
-            raise DependencyResolutionException(injectable, "Invalid constructor.")
-        signature = inspect.signature(constructor)
-        for name, descriptor in signature.parameters.items():
-            if name in ("self", "args", "kwargs"):
-                continue
-            if descriptor.annotation == inspect.Parameter.empty:
-                raise DependencyResolutionException(
-                    injectable,
-                    f"The initializer of '{injectable}' is missing annotations."
-                )
-            yield LifetimeScope.__unpack_dependent_intf(descriptor.annotation)
-
-    @staticmethod
-    def __unpack_dependent_intf(contract: type[Any]) -> tuple[type[Any], bool]:
-        if (
-            getattr(contract, "_is_protocol", False) # typing.Protocol
-            or getattr(contract, "__abstractmethods__", None) # abc.ABCMeta
-            or (origin := getattr(contract, "__origin__", None)) is None
-        ):
-            return (contract, False)
-
-        if origin is not tuple:
-            raise DependencyResolutionException(
-                contract,
-                f"Expected a tuple, but got {origin} for contract {contract}."
-            )
-
-        args = get_args(contract)
-        if len(args) != 2 or args[-1] != Ellipsis:
-            raise DependencyResolutionException(
-                contract,
-                "Expected a tuple with two arguments, the second being an ellipsis."
-            )
-        return (args[0], True)
-
-    @staticmethod
-    def __is_captive_dependency(
-        dependee_scope: InjectableScopeType,
-        dependent_scope: InjectableScopeType) -> bool:
-        ranked_scopes = sorted((dependee_scope, dependent_scope), key=lambda i: SCOPE_TYPE_RANKS[i])
-        return ranked_scopes[0] != dependee_scope
-
-    def __build_dependency_graph_for(self, injectable: type[Any]) -> BidirectedGraph[type[Any]]:
-        graph: BidirectedGraph[type[Any]] = BidirectedGraph()
-        injectables_to_resolve: list[type[Any]] = [injectable]
+    def __build_dependency_graph_for(self, injectable: type) -> BidirectedGraph[type]:
+        graph: BidirectedGraph[type] = BidirectedGraph()
+        injectables_to_resolve: list[type] = [injectable]
         while injectables_to_resolve:
             dependee_injectable = injectables_to_resolve.pop()
             if not graph.try_add_node(dependee_injectable):
@@ -121,7 +67,7 @@ class LifetimeScope(ILifetimeScope):
                 continue
 
             self.__log.debug("Gathering dependent contracts", dependee=dependee_injectable)
-            dependent_contracts = LifetimeScope.__get_dependent_contracts(dependee_injectable)
+            dependent_contracts = get_dependent_contracts(dependee_injectable)
             for dependent_contract, is_multi in dependent_contracts:
                 self.__log.debug("Found dependent contract",
                                dependee=dependee_injectable,
@@ -152,7 +98,7 @@ class LifetimeScope(ILifetimeScope):
 
         return graph
 
-    def __resolve_injectable(self, injectable: type[Any]) -> Any:
+    def __resolve_injectable(self, injectable: type) -> Any:
         registration = self.__catalog.get_registration_by_injectable(injectable)
         if not registration:
             raise DependencyResolutionException(
@@ -165,61 +111,32 @@ class LifetimeScope(ILifetimeScope):
 
         # For singleton and scoped injectables, we know that there exists one and only one
         # instance for all of the associated contracts, therefore we can find and return
-        # taht specific one if it is created already.
-        scope_by_injectable = get_or_add(
-            self.__instances_by_injectable,
-            registration.scope,
-            lambda _: {})
-        instances_by_injectable = get_or_add(scope_by_injectable, injectable, lambda _: set())
+        # that specific one if it is created already.
         if (
-            registration.scope
-            in (InjectableScopeType.SINGLETON, InjectableScopeType.SCOPED)
-            and len(instances_by_injectable) > 0
+            registration.scope in (InjectableScopeType.SINGLETON, InjectableScopeType.SCOPED)
+            and (instances := self.__instances.get_instances_by_contract(
+                injectable,
+                registration.scope
+            ))
+            and (instance := next(iter(instances), None))
         ):
-            return next(iter(instances_by_injectable))
+            return instance
 
-        instance = self.__create_instance(injectable, registration.scope)
-        self.__log.debug("Instantiated injectable", injectable=injectable)
-        instances_by_injectable.add(instance)
+        for resolver in self.__resolvers:
+            instance = resolver.resolve(
+                self.__catalog,
+                self.__instances,
+                injectable,
+                registration.scope
+            )
+            if not instance:
+                continue
 
-        return instance
+            self.__log.debug("Instantiated injectable", injectable=injectable)
+            self.__instances.add_instance(registration.scope, injectable, instance)
+            return instance
 
-    def __create_instance(self, injectable: type[Any], dependee_scope: InjectableScopeType) -> Any:
-        dependent_contracts = LifetimeScope.__get_dependent_contracts(injectable)
-        dependent_injectables = []
-        for dependent_contract, is_multi in dependent_contracts:
-            registrations = self.__catalog.get_registrations_by_contract(dependent_contract)
-            candidate_instances = []
-            for registration in registrations:
-                if LifetimeScope.__is_captive_dependency(dependee_scope, registration.scope):
-                    self.__on_captive_dependency_detected(injectable, dependent_contract)
-
-                scope = get_or_add(self.__instances_by_injectable, registration.scope, lambda _: {})
-                candidate_instances.extend(scope[registration.injectable_type])
-
-            if is_multi:
-                dependent_injectables.append(tuple(candidate_instances))
-            elif len(candidate_instances) > 0:
-                dependent_injectables.append(candidate_instances[0])
-            else:
-                raise DependencyResolutionException(
-                    injectable,
-                    (
-                        "Cannot satisfy the dependency"
-                        f"of '{injectable}' on '{dependent_contract}'."
-                    )
-                )
-
-        return injectable(*dependent_injectables)
-
-    def __on_captive_dependency_detected(self, injectable: type[Any], contract: type[Any]) -> None:
-        # Unless turned off, issue a warning, because a captive dependency
-        # may be the result of a coding error, as it's generally undesirable.
-        error_message = (
-            "Detected captive dependency."
-            f" Singleton '{injectable}' depends on transient '{contract}'."
+        raise DependencyResolutionException(
+            injectable,
+            "None of the resolvers could resolve an instance of the specified type."
         )
-        if not self.__options.suppress_captive_dependency_warnings:
-            self.__log.warn(error_message)
-        if self.__options.raise_on_captive_dependency:
-            raise DependencyResolutionException(injectable, error_message)

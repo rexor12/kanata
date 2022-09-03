@@ -1,5 +1,4 @@
 import unittest
-from typing import Any
 
 from tests.sdk import assert_contains_all, first
 from tests.unit.test_injectables import (
@@ -17,7 +16,7 @@ class ServiceDiscoveryTests(unittest.TestCase):
     def test_find_injectables_should_find_all_injectables_recursively(self):
         """Asserts that all injectables are discovered in a specific module."""
 
-        expected_types: dict[type[Any], tuple[type[Any], ...]] = {
+        expected_types: dict[type, tuple[type, ...]] = {
             Root: (IRoot,),
             Singleton: (ITransient1, ITransient2, ISingleton),
             Transient1: (ITransient1,),

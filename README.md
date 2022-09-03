@@ -64,7 +64,6 @@ As constructor (or `__init__(...)` in Python) injection is used, you need to def
 
 ```py
 from kanata.decorators import injectable
-from typing import Tuple
 
 @injectable(IMyInterface):
 class MyClass(IMyInterface):
@@ -74,7 +73,7 @@ class MyClass(IMyInterface):
         self,
         dependency1: IDependency1,
         dependency2: IDependency2,
-        multiple_dependencies: Tuple[IDependency3, ...]):
+        multiple_dependencies: tuple[IDependency3, ...]):
         ...
 ```
 

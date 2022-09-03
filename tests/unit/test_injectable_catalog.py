@@ -1,8 +1,10 @@
-from .test_injectables import ITransient1, Singleton, Transient1
-from kanata import InjectableCatalog, find_injectables
+import unittest
+
 from tests.sdk import assert_contains, assert_contains_all
 
-import unittest
+from kanata import find_injectables
+from kanata.catalogs import InjectableCatalog
+from .test_injectables import ITransient1, Singleton, Transient1
 
 class InjectableCatalogTests(unittest.TestCase):
     """Unit tests for InjectableCatalog."""
