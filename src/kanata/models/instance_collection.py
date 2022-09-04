@@ -5,6 +5,8 @@ from .iinstance_collection import IInstanceCollection
 from .injectable_scope_type import InjectableScopeType
 
 class InstanceCollection(IInstanceCollection):
+    """A container for resolved instances."""
+
     def __init__(self) -> None:
         self.__instances = dict[InjectableScopeType, dict[type, set]]()
 
@@ -29,6 +31,17 @@ class InstanceCollection(IInstanceCollection):
         injectable_type: type,
         instance: Any
     ) -> None:
+        """Adds the specified instance to the collection associated to
+        the specified injectable type and scope.
+
+        :param scope_type: The scope of the injectable.
+        :type scope_type: InjectableScopeType
+        :param injectable_type: The type of the injectable.
+        :type injectable_type: type
+        :param instance: The injectable instance to be added.
+        :type instance: Any
+        """
+
         if not (instances_by_scope := self.__instances.get(scope_type)):
             self.__instances[scope_type] = instances_by_scope = {}
         if not (instances := instances_by_scope.get(injectable_type)):
