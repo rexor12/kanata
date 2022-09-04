@@ -33,7 +33,17 @@ def get_or_add_attribute(
     return attribute
 
 def get_dependent_contracts(
-    injectable: type) -> Generator[tuple[type, bool], None, None]:
+    injectable: type
+) -> Generator[tuple[type, bool], None, None]:
+    """Gets the types of contracts the specified injectable depends on.
+
+    :param injectable: The injectable for which to get the contracts.
+    :type injectable: type
+    :raises DependencyResolutionException: Raised when the type is not a valid injectable.
+    :yield: The type of the contract and whether multiple instances are allowed.
+    :rtype: Generator[tuple[type, bool], None, None]
+    """
+
     constructor = getattr(injectable, "__init__", None)
     if not constructor or not callable(constructor):
         raise DependencyResolutionException(injectable, "Invalid constructor.")

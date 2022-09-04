@@ -11,4 +11,13 @@ class IInstanceCollection(Protocol):
         contract_type: type,
         scope_type: InjectableScopeType | None = None
     ) -> Generator[Any, None, None]:
+        """Gets all the resolved instances associated to the specified contract.
+
+        :param contract_type: The contract for which to get the instances.
+        :type contract_type: type
+        :param scope_type: An optional scope for which to get the instances, defaults to None
+        :type scope_type: InjectableScopeType | None, optional
+        :yield: Resolved instances associated to the contract.
+        :rtype: Generator[Any, None, None]
+        """
         ...

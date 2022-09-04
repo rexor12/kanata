@@ -4,8 +4,8 @@ from typing import Any, TypeVar
 from kanata.catalogs import IInjectableCatalog
 from kanata.exceptions import DependencyResolutionException
 from kanata.models import (
-    IInstanceCollection, InjectableInstanceRegistration, InjectableRegistration,
-    InjectableScopeType, InjectableTypeRegistration
+    IInstanceCollection, InjectableInstanceRegistration, InjectableScopeType,
+    InjectableTypeRegistration
 )
 from kanata.utils import get_dependent_contracts
 from .iresolver import IResolver
