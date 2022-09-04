@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from typing import Any
 
 import structlog
@@ -9,7 +10,10 @@ from .exceptions import DependencyResolutionException
 from .graphs import BidirectedGraph
 from .graphs.sorting import topological_sort
 from .ilifetime_scope import ILifetimeScope, TInjectable
-from .models import InjectableScopeType, InstanceCollection
+from .models import (
+    InjectableInstanceRegistration, InjectableRegistration, InjectableScopeType,
+    InjectableTypeRegistration, InstanceCollection
+)
 from .resolvers import DefaultResolver, IResolver
 
 class LifetimeScope(ILifetimeScope):
@@ -30,10 +34,7 @@ class LifetimeScope(ILifetimeScope):
         self.__instances = InstanceCollection()
 
     def resolve(self, injectable: type[TInjectable]) -> TInjectable:
-        registration = self.__catalog.get_registration_by_injectable(injectable)
-        if (registration is not None
-            and registration.scope == InjectableScopeType.SINGLETON
-            and self.__parent is not None):
+        if self.__parent and self.__should_resolve_via_parent(injectable):
             return self.__parent.resolve(injectable)
 
         dependency_graph = self.__build_dependency_graph_for(injectable)
@@ -69,32 +70,28 @@ class LifetimeScope(ILifetimeScope):
             self.__log.debug("Gathering dependent contracts", dependee=dependee_injectable)
             dependent_contracts = get_dependent_contracts(dependee_injectable)
             for dependent_contract, is_multi in dependent_contracts:
-                self.__log.debug("Found dependent contract",
-                               dependee=dependee_injectable,
-                               dependent=dependent_contract,
-                               is_multi=is_multi)
+                self.__log.debug(
+                    "Found dependent contract",
+                    dependee=dependee_injectable,
+                    dependent=dependent_contract,
+                    is_multi=is_multi
+                )
                 dependent_registrations = self.__catalog.get_registrations_by_contract(
                     dependent_contract)
                 if len(dependent_registrations) == 0 and not is_multi:
                     raise DependencyResolutionException(
                         dependee_injectable,
-                        (
-                            "Cannot satisfy the dependency"
-                            f" of {dependee_injectable} on {dependent_contract}."
-                        )
+                        "Cannot satisfy the dependency"
+                        f" of {dependee_injectable} on {dependent_contract}."
                     )
 
-                # Mark each implementation as a dependency. At this point,
-                # it is possible only one of them will be needed by
-                # this specific type. But we'll make sure all are initialized
-                # as they may be needed later.
-                for dependent_registration in dependent_registrations:
-                    graph.try_add_node(dependee_injectable)
-                    graph.try_add_edge(dependee_injectable, dependent_registration.injectable_type)
-                    injectables_to_resolve.append(dependent_registration.injectable_type)
-                    self.__log.debug("Identified dependent injectable",
-                                     dependee=dependee_injectable,
-                                     dependent=dependent_registration.injectable_type)
+                injectables_to_resolve.extend(
+                    self.__mark_dependent_types(
+                        graph,
+                        dependee_injectable,
+                        dependent_registrations
+                    )
+                )
 
         return graph
 
@@ -103,15 +100,21 @@ class LifetimeScope(ILifetimeScope):
         if not registration:
             raise DependencyResolutionException(
                 injectable,
-                (
-                    f"Cannot find the registration for injectable '{injectable}'."
-                    " It is possible that this type is not an injectable."
-                )
+                f"Cannot find the registration for injectable '{injectable}'."
+                " It is possible that this type is not an injectable."
             )
 
         # For singleton and scoped injectables, we know that there exists one and only one
         # instance for all of the associated contracts, therefore we can find and return
         # that specific one if it is created already.
+        if isinstance(registration, InjectableInstanceRegistration):
+            return registration.injectable_instance
+        if not isinstance(registration, InjectableTypeRegistration):
+            raise DependencyResolutionException(
+                type(registration),
+                "Unsupported type of injectable registration."
+            )
+
         if (
             registration.scope in (InjectableScopeType.SINGLETON, InjectableScopeType.SCOPED)
             and (instances := self.__instances.get_instances_by_contract(
@@ -140,3 +143,46 @@ class LifetimeScope(ILifetimeScope):
             injectable,
             "None of the resolvers could resolve an instance of the specified type."
         )
+
+    def __should_resolve_via_parent(
+        self,
+        injectable: type
+    ) -> bool:
+        registration = self.__catalog.get_registration_by_injectable(injectable)
+        match registration:
+            case InjectableTypeRegistration(scope=InjectableScopeType.SINGLETON): return True
+            case InjectableInstanceRegistration(): return True
+            case _: return False
+
+    def __mark_dependent_types(
+        self,
+        graph: BidirectedGraph[type],
+        dependee_injectable: type,
+        dependent_registrations: Iterable[InjectableRegistration]
+    ) -> Iterable[type]:
+        # Mark each implementation as a dependency. At this point,
+        # it is possible only one of them will be needed by
+        # this specific type. But we'll make sure all are initialized
+        # as they may be needed later.
+        dependent_types = []
+        for dependent_registration in dependent_registrations:
+            match dependent_registration:
+                case InjectableTypeRegistration():
+                    injectable_type = dependent_registration.injectable_type
+                case InjectableInstanceRegistration():
+                    injectable_type = type(dependent_registration.injectable_instance)
+                case _:
+                    raise DependencyResolutionException(
+                        type(dependent_registration),
+                        "Unsupported type of injectable registration."
+                    )
+
+            graph.try_add_node(dependee_injectable)
+            graph.try_add_edge(dependee_injectable, injectable_type)
+            dependent_types.append(injectable_type)
+            self.__log.debug(
+                "Identified dependent injectable",
+                dependee=dependee_injectable,
+                dependent=injectable_type
+            )
+        return dependent_types

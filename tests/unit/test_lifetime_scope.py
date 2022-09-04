@@ -4,7 +4,7 @@ from typing import TypeVar
 from tests.sdk import assert_contains, assert_contains_unique
 
 from kanata import LifetimeScope, find_injectables
-from kanata.catalogs import InjectableCatalog
+from kanata.catalogs import InjectableCatalog, InjectableCatalogBuilder
 from kanata.exceptions import DependencyResolutionException
 from kanata.resolvers import DefaultResolver, DefaultResolverOptions
 from .test_injectables import (
@@ -14,6 +14,12 @@ from .test_injectables import (
 )
 
 TInjectable = TypeVar("TInjectable")
+
+class _ITestService:
+    pass
+
+class _TestInstanceService(_ITestService):
+    pass
 
 class LifetimeScopeTests(unittest.TestCase):
     """Unit tests for lifetime scopes."""
@@ -247,6 +253,23 @@ class LifetimeScopeTests(unittest.TestCase):
         self.assertIsNotNone(instance)
         self.assertIsInstance(instance, ProtocolDependent)
         self.assertIsInstance(instance.injected, ProtocolImpl)
+
+    def test_resolve_should_return_the_correct_instance_for_instance_registration(self):
+        """Asserts that the lifetime scope correctly returns the
+        already existing instance for a by-instance registration.
+        """
+
+        instance = _TestInstanceService()
+        catalog = (InjectableCatalogBuilder()
+            .register_instance(instance, (_ITestService,))
+            .build()
+        )
+        scope = LifetimeScope(catalog)
+
+        resolved_instance = scope.resolve(_TestInstanceService)
+
+        self.assertIsNotNone(resolved_instance)
+        self.assertIs(resolved_instance, instance)
 
 if __name__ == "__main__":
     unittest.main()

@@ -3,7 +3,10 @@ from typing import Any, TypeVar
 
 from kanata.catalogs import IInjectableCatalog
 from kanata.exceptions import DependencyResolutionException
-from kanata.models import IInstanceCollection, InjectableScopeType
+from kanata.models import (
+    IInstanceCollection, InjectableInstanceRegistration, InjectableRegistration,
+    InjectableScopeType, InjectableTypeRegistration
+)
 from kanata.utils import get_dependent_contracts
 from .iresolver import IResolver
 
@@ -92,18 +95,13 @@ class ResolverBase(ABC, IResolver):
         dependent_contracts = get_dependent_contracts(injectable)
         dependent_injectables = []
         for dependent_contract, is_multi in dependent_contracts:
-            registrations = catalog.get_registrations_by_contract(dependent_contract)
-            candidate_instances = []
-            for registration in registrations:
-                if ResolverBase._is_captive_dependency(dependee_scope, registration.scope):
-                    self._on_captive_dependency_detected(injectable, dependent_contract)
-
-                candidate_instances.extend(
-                    instances.get_instances_by_contract(
-                        registration.injectable_type,
-                        registration.scope
-                    )
-                )
+            candidate_instances = self.__get_candidate_dependent_instances(
+                catalog,
+                instances,
+                injectable,
+                dependee_scope,
+                dependent_contract
+            )
 
             if is_multi:
                 dependent_injectables.append(tuple(candidate_instances))
@@ -117,4 +115,35 @@ class ResolverBase(ABC, IResolver):
                         f"of '{injectable}' on '{dependent_contract}'."
                     )
                 )
+
         return dependent_injectables
+
+    def __get_candidate_dependent_instances(
+        self,
+        catalog: IInjectableCatalog,
+        instances: IInstanceCollection,
+        injectable: type,
+        dependee_scope: InjectableScopeType,
+        dependent_contract: type
+    ) -> list[Any]:
+        registrations = catalog.get_registrations_by_contract(dependent_contract)
+        candidate_instances = []
+        for registration in registrations:
+            if isinstance(registration, InjectableTypeRegistration):
+                if ResolverBase._is_captive_dependency(dependee_scope, registration.scope):
+                    self._on_captive_dependency_detected(injectable, dependent_contract)
+
+                candidate_instances.extend(
+                    instances.get_instances_by_contract(
+                        registration.injectable_type,
+                        registration.scope
+                    )
+                )
+            elif isinstance(registration, InjectableInstanceRegistration):
+                candidate_instances.append(registration.injectable_instance)
+            else: raise DependencyResolutionException(
+                type(registration),
+                "Unsupported type of injectable registration."
+            )
+
+        return candidate_instances
