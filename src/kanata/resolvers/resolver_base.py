@@ -1,16 +1,15 @@
 from abc import ABC, abstractmethod
-from typing import Any, TypeVar
+from collections.abc import Iterable
+from typing import Any, get_args
 
-from kanata.catalogs import IInjectableCatalog
 from kanata.exceptions import DependencyResolutionException
 from kanata.models import (
-    IInstanceCollection, InjectableInstanceRegistration, InjectableScopeType,
-    InjectableTypeRegistration
+    ClosedGenericTypeId, ClosedGenericTypeInfo, IInstanceCollection, InjectableInstanceRegistration,
+    InjectableRegistration, InjectableScopeType, InjectableTypeRegistration
 )
 from kanata.utils import get_dependent_contracts
 from .iresolver import IResolver
-
-TInjectable = TypeVar("TInjectable")
+from .resolver_context import ResolverContext
 
 _SCOPE_TYPE_RANKS: dict[InjectableScopeType, int] = {
     InjectableScopeType.TRANSIENT: 0,
@@ -24,11 +23,10 @@ class ResolverBase(ABC, IResolver):
     @abstractmethod
     def resolve(
         self,
-        catalog: IInjectableCatalog,
-        instances: IInstanceCollection,
-        injectable: type[TInjectable],
-        scope_type: InjectableScopeType
-    ) -> TInjectable:
+        context: ResolverContext,
+        registration: InjectableRegistration,
+        injectable_type: type
+    ) -> Any:
         ...
 
     @staticmethod
@@ -72,17 +70,14 @@ class ResolverBase(ABC, IResolver):
 
     def _get_dependencies(
         self,
-        catalog: IInjectableCatalog,
-        instances: IInstanceCollection,
+        context: ResolverContext,
         injectable: type,
         dependee_scope: InjectableScopeType
     ) -> list[Any]:
         """Gets the dependencies of the specified injectable.
 
-        :param catalog: The catalog of injectables.
-        :type catalog: IInjectableCatalog
-        :param instances: The already resolved instances of injectables.
-        :type instances: IInstanceCollection
+        :param context: Contextual information for the resolver.
+        :type context: ResolverContext
         :param injectable: The type of the injectable for which to get the dependencies.
         :type injectable: type
         :param dependee_scope: The scope of the dependee.
@@ -93,11 +88,10 @@ class ResolverBase(ABC, IResolver):
         """
 
         dependent_contracts = get_dependent_contracts(injectable)
-        dependent_injectables = []
+        dependent_injectables = list[Any]()
         for dependent_contract, is_multi in dependent_contracts:
             candidate_instances = self.__get_candidate_dependent_instances(
-                catalog,
-                instances,
+                context,
                 injectable,
                 dependee_scope,
                 dependent_contract
@@ -112,21 +106,58 @@ class ResolverBase(ABC, IResolver):
                     injectable,
                     (
                         "Cannot satisfy the dependency"
-                        f"of '{injectable}' on '{dependent_contract}'."
+                        f" of '{injectable}' on '{dependent_contract}'."
                     )
                 )
 
         return dependent_injectables
 
+    @staticmethod
+    def __get_candidates_by_type_registration(
+        closed_generic_types: dict[ClosedGenericTypeId, ClosedGenericTypeInfo],
+        instances: IInstanceCollection,
+        registration: InjectableTypeRegistration,
+        dependent_contract: type
+    ) -> Iterable[Any]:
+        return (
+            ResolverBase.__get_closed_generic_instances(
+                closed_generic_types,
+                instances,
+                registration,
+                dependent_contract
+            )
+            if registration.is_generic
+            else instances.get_instances_by_injectable(
+                registration.injectable_type,
+                registration.scope
+            )
+        )
+
+    @staticmethod
+    def __get_closed_generic_instances(
+        closed_generic_types: dict[ClosedGenericTypeId, ClosedGenericTypeInfo],
+        instances: IInstanceCollection,
+        origin_registration: InjectableTypeRegistration,
+        contract_type: type
+    ) -> Iterable[Any]:
+        type_argument = get_args(contract_type)[0]
+        generic_type_id = ClosedGenericTypeId(origin_registration.injectable_type, type_argument)
+        if not (closed_generic_type_info := closed_generic_types.get(generic_type_id)):
+            return ()
+
+        return instances.get_instances_by_injectable(
+            closed_generic_type_info.closed_generic_type,
+            origin_registration.scope
+        )
+
     def __get_candidate_dependent_instances(
         self,
-        catalog: IInjectableCatalog,
-        instances: IInstanceCollection,
+        context: ResolverContext,
         injectable: type,
         dependee_scope: InjectableScopeType,
         dependent_contract: type
     ) -> list[Any]:
-        registrations = catalog.get_registrations_by_contract(dependent_contract)
+        registrations = context.catalog.get_registrations_by_contract(dependent_contract)
         candidate_instances = []
         for registration in registrations:
             if isinstance(registration, InjectableTypeRegistration):
@@ -134,9 +165,11 @@ class ResolverBase(ABC, IResolver):
                     self._on_captive_dependency_detected(injectable, dependent_contract)
 
                 candidate_instances.extend(
-                    instances.get_instances_by_contract(
-                        registration.injectable_type,
-                        registration.scope
+                    ResolverBase.__get_candidates_by_type_registration(
+                        context.closed_generic_types,
+                        context.instances,
+                        registration,
+                        dependent_contract
                     )
                 )
             elif isinstance(registration, InjectableInstanceRegistration):

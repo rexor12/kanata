@@ -10,20 +10,20 @@ class InstanceCollection(IInstanceCollection):
     def __init__(self) -> None:
         self.__instances = dict[InjectableScopeType, dict[type, set]]()
 
-    def get_instances_by_contract(
+    def get_instances_by_injectable(
         self,
-        contract_type: type,
+        injectable_type: type,
         scope_type: InjectableScopeType | None = None
     ) -> Generator[Any, None, None]:
         if scope_type is None:
             for injectables_by_contract in self.__instances.values():
-                yield from injectables_by_contract.get(contract_type, ())
+                yield from injectables_by_contract.get(injectable_type, ())
             return
 
         if not (injectables_by_contract := self.__instances.get(scope_type)):
             return
 
-        yield from injectables_by_contract.get(contract_type, ())
+        yield from injectables_by_contract.get(injectable_type, ())
 
     def add_instance(
         self,

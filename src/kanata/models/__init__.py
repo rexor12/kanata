@@ -1,5 +1,7 @@
 """Models."""
 
+from .closed_generic_type_id import ClosedGenericTypeId
+from .closed_generic_type_info import ClosedGenericTypeInfo
 from .iinstance_collection import IInstanceCollection
 from .injectable_instance_registration import InjectableInstanceRegistration
 from .injectable_registration import InjectableRegistration

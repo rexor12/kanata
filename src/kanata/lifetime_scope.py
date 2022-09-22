@@ -1,5 +1,6 @@
+import types
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, get_args
 
 import structlog
 
@@ -11,10 +12,10 @@ from .graphs import BidirectedGraph
 from .graphs.sorting import topological_sort
 from .ilifetime_scope import ILifetimeScope, TInjectable
 from .models import (
-    InjectableInstanceRegistration, InjectableRegistration, InjectableScopeType,
-    InjectableTypeRegistration, InstanceCollection
+    ClosedGenericTypeId, ClosedGenericTypeInfo, InjectableInstanceRegistration,
+    InjectableRegistration, InjectableScopeType, InjectableTypeRegistration, InstanceCollection
 )
-from .resolvers import DefaultResolver, IResolver
+from .resolvers import DefaultResolver, IResolver, ResolverContext
 
 class LifetimeScope(ILifetimeScope):
     """An injectable lifetime scope
@@ -32,16 +33,25 @@ class LifetimeScope(ILifetimeScope):
         self.__parent = _parent
         self.__log = structlog.get_logger(logger_name=LOGGER_NAME)
         self.__instances = InstanceCollection()
+        # The below dictionaries are used for tracking
+        # the dynamically created closed generic types.
+        self.__closed_generic_type_infos_by_id = dict[ClosedGenericTypeId, ClosedGenericTypeInfo]()
+        self.__closed_generic_type_infos_by_type = dict[type, ClosedGenericTypeInfo]()
 
     def resolve(self, injectable: type[TInjectable]) -> TInjectable:
         if self.__parent and self.__should_resolve_via_parent(injectable):
             return self.__parent.resolve(injectable)
 
         dependency_graph = self.__build_dependency_graph_for(injectable)
+        resolver_context = ResolverContext(
+            catalog=self.__catalog,
+            closed_generic_types=self.__closed_generic_type_infos_by_id,
+            instances=self.__instances
+        )
         instance = None
         for current_injectable in topological_sort(dependency_graph, injectable):
             self.__log.debug("Resolving injectable", type=current_injectable)
-            instance = self.__resolve_injectable(current_injectable)
+            instance = self.__resolve_injectable(resolver_context, current_injectable)
             self.__log.debug("Resolved injectable", type=current_injectable)
 
         if not isinstance(instance, injectable):
@@ -57,6 +67,19 @@ class LifetimeScope(ILifetimeScope):
 
     def create_child_scope(self) -> ILifetimeScope:
         return LifetimeScope(self.__catalog, self.__resolvers, _parent=self)
+
+    @staticmethod
+    def __get_injectable_scope_type(registration: InjectableRegistration) -> InjectableScopeType:
+        match registration:
+            case InjectableTypeRegistration():
+                return registration.scope
+            case InjectableInstanceRegistration():
+                return InjectableScopeType.SINGLETON
+            case _:
+                raise DependencyResolutionException(
+                    type(registration),
+                    "Unsupported type of injectable registration."
+                )
 
     def __build_dependency_graph_for(self, injectable: type) -> BidirectedGraph[type]:
         graph: BidirectedGraph[type] = BidirectedGraph()
@@ -77,7 +100,8 @@ class LifetimeScope(ILifetimeScope):
                     is_multi=is_multi
                 )
                 dependent_registrations = self.__catalog.get_registrations_by_contract(
-                    dependent_contract)
+                    dependent_contract
+                )
                 if len(dependent_registrations) == 0 and not is_multi:
                     raise DependencyResolutionException(
                         dependee_injectable,
@@ -89,54 +113,37 @@ class LifetimeScope(ILifetimeScope):
                     self.__mark_dependent_types(
                         graph,
                         dependee_injectable,
+                        dependent_contract,
                         dependent_registrations
                     )
                 )
 
         return graph
 
-    def __resolve_injectable(self, injectable: type) -> Any:
-        registration = self.__catalog.get_registration_by_injectable(injectable)
-        if not registration:
-            raise DependencyResolutionException(
-                injectable,
-                f"Cannot find the registration for injectable '{injectable}'."
-                " It is possible that this type is not an injectable."
-            )
-
-        # For singleton and scoped injectables, we know that there exists one and only one
-        # instance for all of the associated contracts, therefore we can find and return
-        # that specific one if it is created already.
-        if isinstance(registration, InjectableInstanceRegistration):
-            return registration.injectable_instance
-        if not isinstance(registration, InjectableTypeRegistration):
-            raise DependencyResolutionException(
-                type(registration),
-                "Unsupported type of injectable registration."
-            )
-
-        if (
-            registration.scope in (InjectableScopeType.SINGLETON, InjectableScopeType.SCOPED)
-            and (instances := self.__instances.get_instances_by_contract(
-                injectable,
-                registration.scope
-            ))
-            and (instance := next(iter(instances), None))
-        ):
-            return instance
+    def __resolve_injectable(
+        self,
+        resolver_context: ResolverContext,
+        injectable: type
+    ) -> Any:
+        if closed_generic_type_info := self.__closed_generic_type_infos_by_type.get(injectable):
+            registration = closed_generic_type_info.origin_registration
+        else:
+            registration = self.__catalog.get_registration_by_injectable(injectable)
+            if not registration:
+                raise DependencyResolutionException(
+                    injectable,
+                    f"Cannot find the registration for injectable '{injectable}'."
+                    " It is possible that this type is not an injectable."
+                )
 
         for resolver in self.__resolvers:
-            instance = resolver.resolve(
-                self.__catalog,
-                self.__instances,
-                injectable,
-                registration.scope
-            )
-            if not instance:
+            if not (instance := resolver.resolve(resolver_context, registration, injectable)):
                 continue
 
             self.__log.debug("Instantiated injectable", injectable=injectable)
-            self.__instances.add_instance(registration.scope, injectable, instance)
+            scope = LifetimeScope.__get_injectable_scope_type(registration)
+            self.__instances.add_instance(scope, injectable, instance)
+
             return instance
 
         raise DependencyResolutionException(
@@ -158,6 +165,7 @@ class LifetimeScope(ILifetimeScope):
         self,
         graph: BidirectedGraph[type],
         dependee_injectable: type,
+        dependent_contract: type,
         dependent_registrations: Iterable[InjectableRegistration]
     ) -> Iterable[type]:
         # Mark each implementation as a dependency. At this point,
@@ -166,16 +174,10 @@ class LifetimeScope(ILifetimeScope):
         # as they may be needed later.
         dependent_types = []
         for dependent_registration in dependent_registrations:
-            match dependent_registration:
-                case InjectableTypeRegistration():
-                    injectable_type = dependent_registration.injectable_type
-                case InjectableInstanceRegistration():
-                    injectable_type = type(dependent_registration.injectable_instance)
-                case _:
-                    raise DependencyResolutionException(
-                        type(dependent_registration),
-                        "Unsupported type of injectable registration."
-                    )
+            injectable_type = self.__get_injectable_type(
+                dependent_contract,
+                dependent_registration
+            )
 
             graph.try_add_node(dependee_injectable)
             graph.try_add_edge(dependee_injectable, injectable_type)
@@ -185,4 +187,71 @@ class LifetimeScope(ILifetimeScope):
                 dependee=dependee_injectable,
                 dependent=injectable_type
             )
+
         return dependent_types
+
+    def __get_injectable_type(
+        self,
+        dependent_contract: type,
+        dependent_registration: InjectableRegistration
+    ) -> type:
+        match dependent_registration:
+            case InjectableTypeRegistration():
+                generic_type = self.__get_or_create_generic_type(
+                    dependent_registration,
+                    dependent_contract
+                )
+                return (
+                    generic_type.closed_generic_type if generic_type
+                    else dependent_registration.injectable_type
+                )
+            case InjectableInstanceRegistration():
+                return type(dependent_registration.injectable_instance)
+            case _:
+                raise DependencyResolutionException(
+                    type(dependent_registration),
+                    "Unsupported type of injectable registration."
+                )
+
+    def __get_or_create_generic_type(
+        self,
+        registration: InjectableTypeRegistration,
+        contract: type
+    ) -> ClosedGenericTypeInfo | None:
+        if not registration.is_generic:
+            return None
+
+        type_arguments = get_args(contract)
+        if len(type_arguments) != 1:
+            raise DependencyResolutionException(
+                contract,
+                "The generic contract must have one single generic type argument."
+            )
+
+        type_argument = type_arguments[0]
+        generic_type_id = ClosedGenericTypeId(registration.injectable_type, type_argument)
+
+        # Avoid creating the same type multiple times.
+        if existing_type := self.__closed_generic_type_infos_by_id.get(generic_type_id):
+            return existing_type
+
+        closed_generic_type = types.new_class(
+            f"{registration.injectable_type.__name__}Of{type_argument.__name__}",
+            # Ignoring the type here, because the linter isn't aware this type is a Generic[T].
+            (registration.injectable_type[type_argument],), # type: ignore
+            None,
+            lambda ns: ns.update({
+                "generic_type_argument": property(lambda _: type_argument)
+            })
+        )
+        generic_type_info = ClosedGenericTypeInfo(
+            closed_generic_type=closed_generic_type,
+            generic_type_argument=type_argument,
+            origin_registration=registration
+        )
+
+        # Save the newly created type to avoid recreating it if it's needed later.
+        self.__closed_generic_type_infos_by_id[generic_type_id] = generic_type_info
+        self.__closed_generic_type_infos_by_type[closed_generic_type] = generic_type_info
+
+        return generic_type_info

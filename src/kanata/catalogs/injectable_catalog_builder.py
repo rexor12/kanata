@@ -4,10 +4,12 @@ from collections.abc import Iterable
 from typing import Any
 
 from kanata import find_injectables
+from kanata.exceptions import ArgumentException
 from kanata.models import (
     InjectableInstanceRegistration, InjectableRegistration, InjectableScopeType,
     InjectableTypeRegistration
 )
+from kanata.utils.type_utils import get_generic_type_parameters
 from .iinjectable_catalog import IInjectableCatalog
 from .injectable_catalog import InjectableCatalog
 
@@ -71,15 +73,31 @@ class InjectableCatalogBuilder:
         :rtype: InjectableCatalogBuilder
         """
 
-        # TODO https://github.com/PyCQA/pylint/issues/6550
-        self.__registrations.append(
-            InjectableTypeRegistration( # pylint: disable=unexpected-keyword-arg
-                contract_types=set(contract_types),
-                injectable_type=injectable_type,
-                scope=scope_type
-            )
-        )
-        return self
+        return self.__register_type(injectable_type, contract_types, False, scope_type)
+
+    def register_generic(
+        self,
+        injectable_type: type,
+        contract_types: Iterable[type],
+        scope_type: InjectableScopeType = InjectableScopeType.TRANSIENT
+    ) -> InjectableCatalogBuilder:
+        """Registers the specified generic type as an injectable.
+
+        :param injectable_type: The generic type to be registered.
+        :type injectable_type: type
+        :param contract_types: The contracts by which to register the generic type.
+        :type contract_types: Iterable[type]
+        :param scope_type: The injectable scope, defaults to InjectableScopeType.TRANSIENT
+        :type scope_type: InjectableScopeType, optional
+        :return: The same instance of the builder.
+        :rtype: InjectableCatalogBuilder
+        """
+
+        InjectableCatalogBuilder.__validate_generic_type(injectable_type)
+        for contract_type in contract_types:
+            InjectableCatalogBuilder.__validate_generic_type(contract_type)
+
+        return self.__register_type(injectable_type, contract_types, True, scope_type)
 
     def build(self) -> IInjectableCatalog:
         """Builds the injectable catalog.
@@ -89,3 +107,30 @@ class InjectableCatalogBuilder:
         """
 
         return InjectableCatalog(self.__registrations)
+
+    @staticmethod
+    def __validate_generic_type(typ: type) -> None:
+        if len(get_generic_type_parameters(typ)) != 1:
+            raise ArgumentException(
+                "typ",
+                typ,
+                "A generic injectable type must have a single generic type parameter."
+            )
+
+    def __register_type(
+        self,
+        injectable_type: type,
+        contract_types: Iterable[type],
+        is_generic: bool,
+        scope_type: InjectableScopeType
+    ) -> InjectableCatalogBuilder:
+        # TODO https://github.com/PyCQA/pylint/issues/6550
+        self.__registrations.append(
+            InjectableTypeRegistration( # pylint: disable=unexpected-keyword-arg
+                contract_types=set(contract_types),
+                injectable_type=injectable_type,
+                is_generic=is_generic,
+                scope=scope_type
+            )
+        )
+        return self

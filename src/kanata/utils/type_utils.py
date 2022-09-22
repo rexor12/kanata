@@ -2,7 +2,7 @@
 
 import inspect
 from collections.abc import Callable, Generator
-from typing import TypeVar, get_args
+from typing import Generic, Protocol, TypeVar, get_args, get_origin
 
 from kanata.exceptions import DependencyResolutionException
 
@@ -32,9 +32,7 @@ def get_or_add_attribute(
         setattr(clazz, name, attribute)
     return attribute
 
-def get_dependent_contracts(
-    injectable: type
-) -> Generator[tuple[type, bool], None, None]:
+def get_dependent_contracts(injectable: type) -> Generator[tuple[type, bool], None, None]:
     """Gets the types of contracts the specified injectable depends on.
 
     :param injectable: The injectable for which to get the contracts.
@@ -57,6 +55,25 @@ def get_dependent_contracts(
                 f"The initializer of '{injectable}' is missing annotations."
             )
         yield __unpack_dependent_intf(descriptor.annotation)
+
+def get_generic_type_parameters(typ: type) -> tuple[type, ...]:
+    """Gets the generic type parameters of the specified type, if there are any.
+
+    :param typ: The type to check.
+    :type typ: type
+    :return: The generic type parameters of the type.
+    :rtype: tuple[type, ...]
+    """
+
+    if not (orig_bases := getattr(typ, "__orig_bases__", None)):
+        return ()
+
+    return tuple(set(
+        generic_type_parameter
+        for orig_base in orig_bases
+        if get_origin(orig_base) in {Generic, Protocol}
+        for generic_type_parameter in get_args(orig_base)
+    ))
 
 def __unpack_dependent_intf(contract: type) -> tuple[type, bool]:
     if (
