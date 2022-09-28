@@ -1,12 +1,13 @@
 import unittest
-from typing import TypeVar
+from typing import Any, Generic, Protocol, TypeVar
 
 from tests.sdk import assert_contains, assert_contains_unique
 
 from kanata import LifetimeScope, find_injectables
 from kanata.catalogs import InjectableCatalog, InjectableCatalogBuilder
 from kanata.exceptions import DependencyResolutionException
-from kanata.resolvers import DefaultResolver, DefaultResolverOptions
+from kanata.models import InjectableRegistration, InjectableScopeType
+from kanata.resolvers import DefaultResolver, DefaultResolverOptions, IResolver, ResolverContext
 from .test_injectables import (
     MissingMultipleDependencies, MissingSingleDependency, ProtocolDependent, ProtocolImpl, Root,
     Scoped, ScopedToTransientDependency, Singleton, SingletonToScopedDependency,
@@ -20,6 +21,79 @@ class _ITestService:
 
 class _TestInstanceService(_ITestService):
     pass
+
+class _InstanceDependent:
+    def __init__(
+        self,
+        test_service: _ITestService
+    ) -> None:
+        self.test_service = test_service
+
+_TGeneric = TypeVar("_TGeneric", covariant=True)
+
+class _IGeneric(Protocol[_TGeneric]):
+    @property
+    def value(self) -> _TGeneric:
+        ...
+
+class _GenericImpl(Generic[_TGeneric], _IGeneric[_TGeneric]):
+    @property
+    def value(self) -> _TGeneric:
+        return self.__value
+
+    @property
+    def generic_type_argument(self) -> type:
+        raise NotImplementedError
+
+    def __init__(self, test_service: _ITestService) -> None:
+        super().__init__()
+        self.test_service = test_service
+        self.__value = self.generic_type_argument()
+
+class _GenericImpl2(Generic[_TGeneric], _IGeneric[_TGeneric]):
+    @property
+    def value(self) -> _TGeneric:
+        raise NotImplementedError
+
+class _GenericTypeArg1:
+    pass
+
+class _GenericTypeArg2:
+    pass
+
+class _RootWithDifferentGenericDependencies:
+    def __init__(
+        self,
+        generic1: _IGeneric[_GenericTypeArg1],
+        generic2: _IGeneric[_GenericTypeArg2]
+    ) -> None:
+        self.generic1 = generic1
+        self.generic2 = generic2
+
+class _RootWithIdenticalGenericDependencies:
+    def __init__(
+        self,
+        generic1: _IGeneric[_GenericTypeArg1],
+        generic2: _IGeneric[_GenericTypeArg1]
+    ) -> None:
+        self.generic1 = generic1
+        self.generic2 = generic2
+
+class _RootWithListOfGenericDependencies:
+    def __init__(
+        self,
+        generics: tuple[_IGeneric[_GenericTypeArg1], ...]
+    ) -> None:
+        self.generics = list(generics)
+
+class _NullResolver(IResolver):
+    def resolve(
+        self,
+        context: ResolverContext,
+        registration: InjectableRegistration,
+        injectable_type: type
+    ) -> Any:
+        return None
 
 class LifetimeScopeTests(unittest.TestCase):
     """Unit tests for lifetime scopes."""
@@ -214,7 +288,8 @@ class LifetimeScopeTests(unittest.TestCase):
 
     def test_resolve_of_child_scope_returns_the_same_singleton_as_parent(self):
         """Asserts that the child lifetime scope returns the same instance
-        of a singleton as the parent lifetime scope."""
+        of a singleton as the parent lifetime scope.
+        """
 
         registrations = find_injectables("tests.unit.test_injectables")
         catalog = InjectableCatalog(registrations)
@@ -270,6 +345,139 @@ class LifetimeScopeTests(unittest.TestCase):
 
         self.assertIsNotNone(resolved_instance)
         self.assertIs(resolved_instance, instance)
+
+    def test_resolve_should_resolve_instance_dependent_injectable_correctly(self):
+        """Asserts that the lifetime scope correctly resolves
+        an injectable that depends on another one registered as an instance.
+        """
+
+        instance = _TestInstanceService()
+        catalog = (InjectableCatalogBuilder()
+            .register_instance(instance, (_ITestService,))
+            .register_type(_InstanceDependent, (_InstanceDependent,))
+            .build()
+        )
+        scope = LifetimeScope(catalog)
+
+        resolved_instance = scope.resolve(_InstanceDependent)
+
+        self.assertIsNotNone(resolved_instance)
+        self.assertIsNotNone(resolved_instance.test_service)
+        self.assertIs(resolved_instance.test_service, instance)
+
+    def test_resolve_should_raise_when_no_resolver_can_resolve_a_dependency(self):
+        """Asserts that the lifetime scope raises an exception
+        when none of the available resolvers can resolve
+        an instance of the injectable.
+        """
+
+        catalog = (InjectableCatalogBuilder()
+            .register_type(Transient1, (Transient1,))
+            .build()
+        )
+        scope = LifetimeScope(catalog, (_NullResolver(),))
+
+        self.assertRaises(
+            DependencyResolutionException,
+            lambda: scope.resolve(Transient1)
+        )
+
+    def test_resolve_should_resolve_correctly_for_generic_type(self):
+        """Asserts that the lifetime scope correctly resolves
+        injectables registered in a generic fashion.
+        """
+
+        catalog = (InjectableCatalogBuilder()
+            .register_type(_RootWithDifferentGenericDependencies, (_RootWithDifferentGenericDependencies,))
+            .register_type(_TestInstanceService, (_ITestService,), InjectableScopeType.SINGLETON)
+            .register_generic(_GenericImpl, (_IGeneric,))
+            .build()
+        )
+        scope = LifetimeScope(catalog)
+
+        resolved_instance = scope.resolve(_RootWithDifferentGenericDependencies)
+
+        self.assertIsNotNone(resolved_instance)
+        self.assertIsNotNone(resolved_instance.generic1)
+        self.assertIsNotNone(resolved_instance.generic2)
+        self.assertIsNotNone(resolved_instance.generic1.value)
+        self.assertIsNotNone(resolved_instance.generic2.value)
+
+    def test_resolve_should_resolve_correctly_for_generic_type_with_identical_singletons(self):
+        """Asserts that the lifetime scope correctly resolves
+        the same instance registered in a generic fashion.
+        """
+
+        catalog = (InjectableCatalogBuilder()
+            .register_type(_RootWithIdenticalGenericDependencies, (_RootWithIdenticalGenericDependencies,))
+            .register_type(_TestInstanceService, (_ITestService,), InjectableScopeType.SINGLETON)
+            .register_generic(_GenericImpl, (_IGeneric,), InjectableScopeType.SINGLETON)
+            .build()
+        )
+        scope = LifetimeScope(catalog)
+
+        resolved_instance = scope.resolve(_RootWithIdenticalGenericDependencies)
+
+        self.assertIsNotNone(resolved_instance)
+        self.assertIsNotNone(resolved_instance.generic1)
+        self.assertIs(resolved_instance.generic1, resolved_instance.generic2)
+
+    def test_resolve_should_resolve_correctly_for_generic_type_list(self):
+        """Asserts that the lifetime scope correctly resolves
+        a list of injectables registered in a generic fashion.
+        """
+
+        catalog = (InjectableCatalogBuilder()
+            .register_type(_RootWithListOfGenericDependencies, (_RootWithListOfGenericDependencies,))
+            .register_type(_TestInstanceService, (_ITestService,), InjectableScopeType.SINGLETON)
+            .register_generic(_GenericImpl, (_IGeneric,))
+            .register_generic(_GenericImpl2, (_IGeneric,))
+            .build()
+        )
+        scope = LifetimeScope(catalog)
+
+        resolved_instance = scope.resolve(_RootWithListOfGenericDependencies)
+
+        self.assertIsNotNone(resolved_instance)
+        self.assertIsNotNone(resolved_instance.generics)
+        self.assertEqual(len(resolved_instance.generics), 2)
+        assert_contains(resolved_instance.generics, lambda i: issubclass(type(i), _GenericImpl))
+        assert_contains(resolved_instance.generics, lambda i: issubclass(type(i), _GenericImpl2))
+        assert_contains_unique(resolved_instance.generics, type)
+
+    def test_resolve_should_resolve_correctly_when_generic_injectable_is_not_found_for_list_dependency(self):
+        """Asserts that the lifetime scope correctly resolved
+        the injectable when its list of generic injectables dependency
+        cannot be satisfied.
+        """
+
+        catalog = (InjectableCatalogBuilder()
+            .register_type(_RootWithListOfGenericDependencies, (_RootWithListOfGenericDependencies,))
+            .build()
+        )
+        scope = LifetimeScope(catalog)
+
+        resolved_instance = scope.resolve(_RootWithListOfGenericDependencies)
+
+        self.assertIsNotNone(resolved_instance)
+        self.assertIsNotNone(resolved_instance.generics)
+        self.assertEqual(len(resolved_instance.generics), 0)
+
+    def test_resolve_should_raise_when_generic_injectable_is_not_found(self):
+        """Asserts that the lifetime scope raises an exception
+        when the required generic injectable hasn't been registered.
+        """
+
+        catalog = (InjectableCatalogBuilder()
+            .register_type(_RootWithIdenticalGenericDependencies, (_RootWithIdenticalGenericDependencies,))
+            .build()
+        )
+        scope = LifetimeScope(catalog)
+
+        self.assertRaises(
+            DependencyResolutionException,
+            lambda: scope.resolve(_RootWithIdenticalGenericDependencies)
+        )
 
 if __name__ == "__main__":
     unittest.main()

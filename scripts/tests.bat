@@ -7,5 +7,7 @@ REM python -m pip install -e .
 setlocal
 echo Running tests..
 cd /D "%CD%"
-python -m unittest -v
+python -m pip install -U coverage
+coverage run -m unittest -v
+coverage xml
 echo Running tests complete.

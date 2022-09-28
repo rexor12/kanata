@@ -1,10 +1,11 @@
 from collections.abc import Iterable
+from typing import get_origin
 
 from kanata.exceptions import InjectableRegistrationException
 from kanata.models import (
     InjectableInstanceRegistration, InjectableRegistration, InjectableTypeRegistration
 )
-from kanata.utils import get_or_add
+from kanata.utils import get_generic_type_parameters, get_or_add
 from .iinjectable_catalog import IInjectableCatalog
 
 class InjectableCatalog(IInjectableCatalog):
@@ -22,7 +23,14 @@ class InjectableCatalog(IInjectableCatalog):
         self,
         contract: type
     ) -> tuple[InjectableRegistration, ...]:
-        return tuple(self.__registrations_by_contract.get(contract, []))
+        registrations = [*self.__registrations_by_contract.get(contract, ())]
+
+        if (origin := get_origin(contract)) and get_generic_type_parameters(origin):
+            registrations.extend(
+                self.__registrations_by_contract.get(origin, ())
+            )
+
+        return tuple(registrations)
 
     def get_registration_by_injectable(
         self,
