@@ -2,6 +2,7 @@
 
 import importlib
 import inspect
+import os
 import pkgutil
 from types import ModuleType
 from typing import Any
@@ -23,14 +24,30 @@ def find_injectables(module_name: str) -> tuple[InjectableRegistration, ...]:
     logger = structlog.get_logger(logger_name=LOGGER_NAME)
     registrations: list[InjectableRegistration] = []
     module_names: list[str] = [module_name]
+    discovered_module_names = set[str]()
+    root_path: str | None = None
     while module_names:
         module_name = module_names.pop()
+        # (Issue #23) Validate the path to avoid importing non-existent packages.
+        if root_path:
+            expected_path = os.path.join(root_path, *module_name.split("."))
+            if not os.path.exists(expected_path):
+                continue
+
+        if module_name in discovered_module_names:
+            continue
+
         logger.debug("Loading module", name=module_name)
+        discovered_module_names.add(module_name)
         module = importlib.import_module(module_name)
         registrations.extend(__get_registrations(module, logger))
 
-        if (path := getattr(module, "__path__", None)) is None:
+        if not (path := getattr(module, "__path__", None)):
             continue
+
+        if not root_path:
+            path_head, path_tail = os.path.split(path[0])
+            root_path = path_head or path_tail
 
         logger.debug("Walking path", path=path)
         for _, name, is_package in pkgutil.walk_packages(path):
