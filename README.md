@@ -13,7 +13,7 @@ Currently, the following lifetime scopes are supported:
 
 # Requirements
 
-The project currently targets [Python](https://www.python.org/) version 3.10 or higher. Compatibility with older versions may be possible but isn't tested.
+The project currently targets [Python](https://www.python.org/) version 3.11 or higher. Compatibility with older versions may be possible but isn't tested.
 
 # Getting started
 
